@@ -87,15 +87,17 @@ export async function listFolders(ownerId: string, parentId?: string) {
         },
     });
 
-    return folders.map((folder) => ({
-        id: folder.id,
-        name: folder.name,
-        parentId: folder.parentId,
-        createdAt: folder.createdAt,
-        updatedAt: folder.updatedAt,
-        filesCount: folder._count.files,
-        foldersCount: folder._count.children,
-    }));
+    return {
+        folders: folders.map((folder) => ({
+            id: folder.id,
+            name: folder.name,
+            parentId: folder.parentId,
+            createdAt: folder.createdAt,
+            updatedAt: folder.updatedAt,
+            filesCount: folder._count.files,
+            foldersCount: folder._count.children,
+        })),
+    };
 }
 
 /**
