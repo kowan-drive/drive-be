@@ -29,7 +29,8 @@ export async function ensureBucket(): Promise<void> {
 }
 
 /**
- * Upload file to MinIO with SSE-C encryption
+ * Upload file to MinIO
+ * Note: SSE-C encryption removed to support non-SSL connections in development
  */
 export async function uploadFileWithEncryption(
     objectKey: string,
@@ -37,47 +38,27 @@ export async function uploadFileWithEncryption(
     encryptionKey: Buffer,
     metadata?: Record<string, string>,
 ) {
-    const headers = {
-        'X-Amz-Server-Side-Encryption-Customer-Algorithm': 'AES256',
-        'X-Amz-Server-Side-Encryption-Customer-Key': encryptionKey.toString('base64'),
-        'X-Amz-Server-Side-Encryption-Customer-Key-MD5': require('crypto')
-            .createHash('md5')
-            .update(encryptionKey)
-            .digest('base64'),
-    };
-
     return await minioClient.putObject(
         BUCKET_NAME,
         objectKey,
         buffer,
         buffer.length,
-        {
-            ...metadata,
-            ...headers,
-        },
+        metadata,
     );
 }
 
 /**
- * Download file from MinIO with SSE-C decryption
+ * Download file from MinIO
+ * Note: SSE-C decryption removed to support non-SSL connections in development
  */
 export async function downloadFileWithDecryption(
     objectKey: string,
     encryptionKey: Buffer,
 ): Promise<Buffer> {
-    const headers = {
-        'X-Amz-Server-Side-Encryption-Customer-Algorithm': 'AES256',
-        'X-Amz-Server-Side-Encryption-Customer-Key': encryptionKey.toString('base64'),
-        'X-Amz-Server-Side-Encryption-Customer-Key-MD5': require('crypto')
-            .createHash('md5')
-            .update(encryptionKey)
-            .digest('base64'),
-    };
-
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
 
-        minioClient.getObject(BUCKET_NAME, objectKey, headers, (err, dataStream) => {
+        minioClient.getObject(BUCKET_NAME, objectKey, (err, dataStream) => {
             if (err) {
                 reject(err);
                 return;

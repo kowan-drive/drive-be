@@ -95,7 +95,7 @@ export async function uploadFile(params: UploadFileParams) {
         return {
             id: updatedFile.id,
             name: updatedFile.name,
-            size: updatedFile.size,
+            size: updatedFile.size.toString(),
             mimeType: updatedFile.mimeType,
             folderId: updatedFile.folderId,
             createdAt: updatedFile.createdAt,
@@ -203,7 +203,10 @@ export async function listFiles(params: ListFilesParams) {
     ]);
 
     return {
-        files,
+        files: files.map(file => ({
+            ...file,
+            size: file.size.toString(),
+        })),
         pagination: {
             page,
             limit,
@@ -243,7 +246,10 @@ export async function getFileMetadata(fileId: string, userId: string) {
         throw new Error('File not found or access denied');
     }
 
-    return file;
+    return {
+        ...file,
+        size: file.size.toString(),
+    };
 }
 
 /**
