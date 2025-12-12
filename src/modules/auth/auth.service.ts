@@ -112,8 +112,8 @@ export async function verifyRegistration(verification: RegistrationVerification)
         throw new Error('Registration verification failed');
     }
 
-    const { credentialID, credentialPublicKey, counter } =
-        verification_result.registrationInfo;
+    const { id, publicKey, counter } =
+        verification_result.registrationInfo.credential;
 
     // Create user and credential in database
     const user = await prisma.user.create({
@@ -123,8 +123,8 @@ export async function verifyRegistration(verification: RegistrationVerification)
             tier: 'FREE',
             credentials: {
                 create: {
-                    credentialId: Buffer.from(credentialID).toString('base64'),
-                    publicKey: Buffer.from(credentialPublicKey).toString('base64'),
+                    credentialId: id,
+                    publicKey: Buffer.from(publicKey).toString('base64'),
                     counter: BigInt(counter),
                     transports: credential.response.transports || [],
                     deviceName: deviceName || 'Unknown Device',
@@ -171,7 +171,7 @@ export async function generateAuthentication(options: LoginOptions) {
         rpID: ENV.WEBAUTHN_RP_ID,
         timeout: 60000,
         allowCredentials: user.credentials.map((cred) => ({
-            id: Buffer.from(cred.credentialId, 'base64'),
+            id: cred.credentialId,
             type: 'public-key',
             transports: cred.transports as AuthenticatorTransport[],
         })),
@@ -223,10 +223,11 @@ export async function verifyAuthentication(verification: LoginVerification) {
         expectedChallenge,
         expectedOrigin: ENV.WEBAUTHN_ORIGIN,
         expectedRPID: ENV.WEBAUTHN_RP_ID,
-        authenticator: {
-            credentialID: Buffer.from(userCredential.credentialId, 'base64'),
-            credentialPublicKey: Buffer.from(userCredential.publicKey, 'base64'),
+        credential: {
+            id: userCredential.credentialId,
+            publicKey: Buffer.from(userCredential.publicKey, 'base64'),
             counter: Number(userCredential.counter),
+            transports: userCredential.transports as AuthenticatorTransport[],
         },
     };
 
@@ -236,44 +237,44 @@ export async function verifyAuthentication(verification: LoginVerification) {
         throw new Error('Authentication verification failed');
     }
 
-    // Update credential counter
-    await prisma.credential.update({
-        where: { id: userCredential.id },
-        data: {
-            counter: BigInt(verification_result.authenticationInfo.newCounter),
-            lastUsed: new Date(),
-        },
-    });
+        // Update credential counter
+        await prisma.credential.update({
+            where: { id: userCredential.id },
+            data: {
+                counter: BigInt(verification_result.authenticationInfo.newCounter),
+                lastUsed: new Date(),
+            },
+        });
 
-    // Create session
-    const sessionToken = generateSessionToken();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + ENV.SESSION_EXPIRY_HOURS);
+        // Create session
+        const sessionToken = generateSessionToken();
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + ENV.SESSION_EXPIRY_HOURS);
 
-    const session = await prisma.session.create({
-        data: {
-            token: sessionToken,
-            userId: user.id,
-            expiresAt,
-        },
-    });
+        const session = await prisma.session.create({
+            data: {
+                token: sessionToken,
+                userId: user.id,
+                expiresAt,
+            },
+        });
 
-    // Clean up challenge
-    challenges.delete(email);
+        // Clean up challenge
+        challenges.delete(email);
 
-    return {
-        session: {
-            token: session.token,
-            expiresAt: session.expiresAt,
-        },
-        user: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            tier: user.tier,
-            storageUsed: user.storageUsed,
-        },
-    };
+        return {
+            session: {
+                token: session.token,
+                expiresAt: session.expiresAt,
+            },
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+                tier: user.tier,
+                storageUsed: Number(user.storageUsed),
+            },
+        };
 }
 
 /**
