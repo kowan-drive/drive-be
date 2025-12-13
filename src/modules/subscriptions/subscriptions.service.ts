@@ -9,7 +9,7 @@ export async function getTiers() {
     const tiers = [
         {
             name: 'FREE',
-            quota: getQuotaLimit('FREE'),
+            quota: Number(getQuotaLimit('FREE')),
             quotaFormatted: formatBytes(getQuotaLimit('FREE')),
             price: 0,
             features: [
@@ -21,7 +21,7 @@ export async function getTiers() {
         },
         {
             name: 'PRO',
-            quota: getQuotaLimit('PRO'),
+            quota: Number(getQuotaLimit('PRO')),
             quotaFormatted: formatBytes(getQuotaLimit('PRO')),
             price: 4.99,
             features: [
@@ -34,7 +34,7 @@ export async function getTiers() {
         },
         {
             name: 'PREMIUM',
-            quota: getQuotaLimit('PREMIUM'),
+            quota: Number(getQuotaLimit('PREMIUM')),
             quotaFormatted: formatBytes(getQuotaLimit('PREMIUM')),
             price: 9.99,
             features: [
@@ -90,9 +90,9 @@ export async function upgradeTier(userId: string, newTier: Tier) {
 
     return {
         tier: updatedUser.tier,
-        quota: getQuotaLimit(newTier),
+        quota: Number(getQuotaLimit(newTier)),
         quotaFormatted: formatBytes(getQuotaLimit(newTier)),
-        storageUsed: updatedUser.storageUsed,
+        storageUsed: Number(updatedUser.storageUsed),
         storageUsedFormatted: formatBytes(updatedUser.storageUsed),
     };
 }
@@ -114,12 +114,12 @@ export async function getUsage(userId: string) {
 
     return {
         tier: user.tier,
-        storageUsed: user.storageUsed.toString(),
+        storageUsed: Number(user.storageUsed),
         storageUsedFormatted: formatBytes(user.storageUsed),
-        quota: quota.toString(),
+        quota: Number(quota),
         quotaFormatted: formatBytes(quota),
         usagePercentage,
-        remaining: (quota - user.storageUsed).toString(),
+        remaining: Number(quota - user.storageUsed),
         remainingFormatted: formatBytes(quota - user.storageUsed),
     };
 }
