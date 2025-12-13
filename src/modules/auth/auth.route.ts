@@ -142,19 +142,30 @@ auth.post('/logout', authMiddleware, async (c) => {
  * Get current authenticated user
  */
 auth.get('/me', authMiddleware, async (c) => {
-    const user = c.get('user');
+    try {
+        const user = c.get('user');
 
-    return c.json({
-        success: true,
-        data: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            tier: user.tier,
-            storageUsed: user.storageUsed,
-            createdAt: user.createdAt,
-        },
-    });
+        return c.json({
+            success: true,
+            data: {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+                tier: user.tier,
+                storageUsed: Number(user.storageUsed),
+                createdAt: user.createdAt,
+            },
+        });
+    } catch (error) {
+        console.error('Error in /auth/me:', error);
+        return c.json(
+            {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to get user data',
+            },
+            500,
+        );
+    }
 });
 
 export default auth;
