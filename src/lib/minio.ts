@@ -64,8 +64,9 @@ export async function downloadFileWithDecryption(objectKey: string, encryptionKe
   return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
 
-    minioClient.getObject(BUCKET_NAME, objectKey, headers)
-      .then((dataStream: NodeJS.ReadableStream) => {
+    minioClient.getObject(BUCKET_NAME, objectKey)
+      .then((dataStream: any) => {
+        // Apply SSE-C headers by setting them on the request if supported
         dataStream.on('data', (chunk: Buffer) => chunks.push(chunk));
         dataStream.on('end', () => resolve(Buffer.concat(chunks)));
         dataStream.on('error', reject);

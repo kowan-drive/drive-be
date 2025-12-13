@@ -1,6 +1,7 @@
 import prisma from '../../../prisma/prisma';
 import { generateShareToken } from '../../lib/encryption';
 import { generatePresignedUrl } from '../../lib/minio';
+import { ENV } from '../../lib/env';
 
 interface CreateShareParams {
   fileId: string;
@@ -22,7 +23,7 @@ export async function createShare(params: CreateShareParams) {
 
   const share = await prisma.share.create({ data: { token, fileId, expiresAt, maxDownloads: maxDownloads || null } });
 
-  return { token: share.token, shareUrl: `${process.env.APP_URL || 'http://localhost:3001'}/api/v1/shares/${token}`, expiresAt: share.expiresAt, maxDownloads: share.maxDownloads };
+  return { token: share.token, shareUrl: `${ENV.APP_URL}/api/v1/shares/${token}`, expiresAt: share.expiresAt, maxDownloads: share.maxDownloads };
 }
 
 export async function accessShare(token: string) {
@@ -43,7 +44,7 @@ export async function accessShare(token: string) {
 export async function listShares(userId: string) {
   const shares = await prisma.share.findMany({ where: { file: { ownerId: userId }, expiresAt: { gt: new Date() } }, include: { file: { select: { id: true, name: true, size: true, mimeType: true } } }, orderBy: { createdAt: 'desc' } });
 
-  return shares.map((share: any) => ({ id: share.id, token: share.token, shareUrl: `${process.env.APP_URL || 'http://localhost:3001'}/api/v1/shares/${share.token}`, file: share.file, expiresAt: share.expiresAt, maxDownloads: share.maxDownloads, downloadCount: share.downloadCount, createdAt: share.createdAt }));
+  return shares.map((share: any) => ({ id: share.id, token: share.token, shareUrl: `${ENV.APP_URL}/api/v1/shares/${share.token}`, file: share.file, expiresAt: share.expiresAt, maxDownloads: share.maxDownloads, downloadCount: share.downloadCount, createdAt: share.createdAt }));
 }
 
 export async function deleteShare(shareId: string, userId: string) {
