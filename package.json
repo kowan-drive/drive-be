@@ -1,5 +1,5 @@
 {
-  "name": "fcw-be",
+  "name": "vibecloud",
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "generate": "bun scripts/generate-module.script.ts",
