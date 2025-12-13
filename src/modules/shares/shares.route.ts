@@ -6,6 +6,7 @@ import {
     accessShare,
     listShares,
     deleteShare,
+    getShareInfo,
 } from './shares.service';
 import { createShareSchema, accessShareSchema } from './shares.schema';
 
@@ -60,6 +61,30 @@ shares.get('/', authMiddleware, async (c) => {
             {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to list shares',
+            },
+            400,
+        );
+    }
+});
+
+/**
+ * GET /shares/:token/info
+ * Get share information without incrementing download count (public, no auth required)
+ */
+shares.get('/:token/info', async (c) => {
+    try {
+        const token = c.req.param('token');
+        const result = await getShareInfo(token);
+
+        return c.json({
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        return c.json(
+            {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to get share info',
             },
             400,
         );

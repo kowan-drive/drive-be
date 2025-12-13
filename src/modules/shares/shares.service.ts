@@ -53,6 +53,41 @@ export async function createShare(params: CreateShareParams) {
 }
 
 /**
+ * Get share information without incrementing download count
+ */
+export async function getShareInfo(token: string) {
+    const share = await prisma.share.findUnique({
+        where: { token },
+        include: {
+            file: true,
+        },
+    });
+
+    if (!share) {
+        throw new Error('Share link not found');
+    }
+
+    // Check if expired
+    if (share.expiresAt < new Date()) {
+        throw new Error('Share link has expired');
+    }
+
+    // Check download limit
+    if (share.maxDownloads !== null && share.downloadCount >= share.maxDownloads) {
+        throw new Error('Download limit reached for this share link');
+    }
+
+    return {
+        filename: share.file.name,
+        size: Number(share.file.size),
+        mimeType: share.file.mimeType,
+        expiresAt: share.expiresAt,
+        downloadsRemaining:
+            share.maxDownloads !== null ? share.maxDownloads - share.downloadCount : null,
+    };
+}
+
+/**
  * Access a shared file (returns presigned URL)
  */
 export async function accessShare(token: string) {
@@ -96,7 +131,7 @@ export async function accessShare(token: string) {
     return {
         presignedUrl,
         filename: share.file.name,
-        size: share.file.size,
+        size: Number(share.file.size),
         mimeType: share.file.mimeType,
         expiresAt: share.expiresAt,
         downloadsRemaining:
@@ -136,7 +171,10 @@ export async function listShares(userId: string) {
         id: share.id,
         token: share.token,
         shareUrl: `${process.env.APP_URL || 'http://localhost:3001'}/api/v1/shares/${share.token}`,
-        file: share.file,
+        file: {
+            ...share.file,
+            size: Number(share.file.size),
+        },
         expiresAt: share.expiresAt,
         maxDownloads: share.maxDownloads,
         downloadCount: share.downloadCount,
