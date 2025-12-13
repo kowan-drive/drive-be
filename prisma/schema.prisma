@@ -75,6 +75,8 @@ model File {
   size              BigInt   // File size in bytes
   mimeType          String   @map("mime_type") @db.VarChar(100)
   encryptionKeySalt String   @map("encryption_key_salt") // Salt for deriving file encryption key
+  encryptedFileKey  String?  @map("encrypted_file_key") @db.Text // Encrypted file-specific key
+  encryptionIv      String?  @map("encryption_iv") // IV for file key encryption
   minioObjectKey    String   @unique @map("minio_object_key") // Object key in MinIO
   folderId          String?  @map("folder_id")
   ownerId           String   @map("owner_id")

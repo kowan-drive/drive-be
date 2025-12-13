@@ -1,9 +1,17 @@
-import { company, USER_ROLE } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { Pagination } from './middlewares/pagination.middleware';
 
-export type authenticatedRoute = {
-  Variables: {
-    user: { id: string; email: string; role: USER_ROLE; company?: company };
-    pagination?: Pagination;
-  };
-};
+/**
+ * Extend Hono context with custom variables
+ */
+declare module 'hono' {
+    interface ContextVariableMap {
+        user: User;
+        sessionToken: string;
+        uploadFile: File;
+        fileSize: bigint;
+        pagination?: Pagination;
+    }
+}
+
+export {};

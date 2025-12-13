@@ -12,6 +12,8 @@ interface UploadFileParams {
     file: File;
     fileSize: bigint;
     folderId?: string;
+    encryptedFileKey?: string;
+    encryptionIv?: string;
 }
 
 interface ListFilesParams {
@@ -25,7 +27,7 @@ interface ListFilesParams {
  * Upload file with SSE-C encryption
  */
 export async function uploadFile(params: UploadFileParams) {
-    const { user, file, fileSize, folderId } = params;
+    const { user, file, fileSize, folderId, encryptedFileKey, encryptionIv } = params;
 
     // Validate folder ownership if provided
     if (folderId) {
@@ -54,6 +56,8 @@ export async function uploadFile(params: UploadFileParams) {
             minioObjectKey: '', // Will be updated after we have the file ID
             folderId: folderId || null,
             ownerId: user.id,
+            encryptedFileKey: encryptedFileKey || null,
+            encryptionIv: encryptionIv || null,
         },
     });
 
@@ -233,6 +237,8 @@ export async function getFileMetadata(fileId: string, userId: string) {
             folderId: true,
             createdAt: true,
             updatedAt: true,
+            encryptedFileKey: true,
+            encryptionIv: true,
             folder: {
                 select: {
                     id: true,

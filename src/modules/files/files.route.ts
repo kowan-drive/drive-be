@@ -33,12 +33,16 @@ files.post('/upload', quotaMiddleware, async (c) => {
 
         const body = await c.req.parseBody();
         const folderId = body.folderId as string | undefined;
+        const encryptedFileKey = body.encryptedFileKey as string | undefined;
+        const encryptionIv = body.encryptionIv as string | undefined;
 
         const result = await uploadFile({
             user,
             file,
             fileSize,
             folderId,
+            encryptedFileKey,
+            encryptionIv,
         });
 
         return c.json({
