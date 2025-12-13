@@ -1,0 +1,157 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Authentication Models
+// ============================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  tier         Tier     @default(FREE)
+  storageUsed  BigInt   @default(0) @map("storage_used") // in bytes
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  credentials          Credential[]
+  sessions             Session[]
+  files                File[]
+  folders              Folder[]
+  subscriptionHistory  SubscriptionHistory[]
+
+  @@map("users")
+}
+
+model Credential {
+  id                   String   @id @default(uuid())
+  credentialId         String   @unique @map("credential_id") // WebAuthn credential ID (base64)
+  publicKey            String   @map("public_key") // Public key (base64)
+  counter              BigInt   @default(0) // Signature counter for replay attack prevention
+  transports           String[] // Authenticator transports (usb, nfc, ble, internal)
+  deviceName           String?  @map("device_name") @db.VarChar(100)
+  userId               String   @map("user_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  lastUsed             DateTime @default(now()) @map("last_used")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credentials")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ============================================
+// Storage Models
+// ============================================
+
+model File {
+  id                String   @id @default(uuid())
+  name              String   @db.VarChar(255)
+  size              BigInt   // File size in bytes
+  mimeType          String   @map("mime_type") @db.VarChar(100)
+  encryptionKeySalt String   @map("encryption_key_salt") // Salt for deriving file encryption key
+  minioObjectKey    String   @unique @map("minio_object_key") // Object key in MinIO
+  folderId          String?  @map("folder_id")
+  ownerId           String   @map("owner_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner  User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  shares Share[]
+
+  @@index([ownerId])
+  @@index([folderId])
+  @@map("files")
+}
+
+model Folder {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(255)
+  parentId  String?  @map("parent_id") // Self-reference for nested folders
+  ownerId   String   @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parent   Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderHierarchy")
+  files    File[]
+
+  @@index([ownerId])
+  @@index([parentId])
+  @@map("folders")
+}
+
+model Share {
+  id           String    @id @default(uuid())
+  token        String    @unique
+  fileId       String    @map("file_id")
+  expiresAt    DateTime  @map("expires_at")
+  maxDownloads Int?      @map("max_downloads") // Null = unlimited
+  downloadCount Int      @default(0) @map("download_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([fileId])
+  @@map("shares")
+}
+
+// ============================================
+// Subscription & Quota Models
+// ============================================
+
+model SubscriptionHistory {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  fromTier  Tier     @map("from_tier")
+  toTier    Tier     @map("to_tier")
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("subscription_history")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum Tier {
+  FREE    // 50 MB
+  PRO     // 500 MB
+  PREMIUM // 1 GB
+}
+
