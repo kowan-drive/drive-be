@@ -1,9 +1,9 @@
-import type { Context } from 'elysia';
+import Elysia, { type Context } from 'elysia';
 import { errorResponse } from '../lib/response';
 import { getUserFromSession } from '../modules/auth/auth.service';
 
-export function authMiddleware() {
-  return async (c: Context, next: () => Promise<void>) => {
+export const authMiddleware = new Elysia({ name: 'auth' })
+  .onBeforeHandle(async (c: Context) => {
     const authHeader = c.request.headers.get('authorization') || '';
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -34,10 +34,7 @@ export function authMiddleware() {
       (c as any).set('sessionToken', token);
       (c as any).user = user;
       (c as any).sessionToken = token;
-
-      await next();
     } catch (err) {
       return errorResponse({ message: 'Authentication failed', status: 401 });
     }
-  };
-}
+  });

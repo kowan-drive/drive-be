@@ -2,8 +2,10 @@ import Elysia from 'elysia';
 import { getTiers, upgradeTier, getUsage, getSubscriptionHistory } from './subscriptions.service';
 import { upgradeTierSchema } from './subscriptions.schema';
 import { successResponse, errorResponse } from '../../lib/response';
+import { authMiddleware } from '../../middlewares/auth.middleware';
 
-export const subscriptionsRoute = new Elysia({ prefix: '/subscriptions', tags: ['Subscriptions'] })
+// Public route - no auth required
+export const publicSubscriptionsRoute = new Elysia({ prefix: '/subscriptions', tags: ['Subscriptions'] })
   .get('/tiers', async (c) => {
     try {
       const tiers = await getTiers();
@@ -11,7 +13,10 @@ export const subscriptionsRoute = new Elysia({ prefix: '/subscriptions', tags: [
     } catch (err) {
       return errorResponse({ message: err instanceof Error ? err.message : 'Failed to get tiers', status: 400 });
     }
-  })
+  });
+
+// Protected routes - auth required
+export const subscriptionsRoute = new Elysia({ prefix: '/subscriptions', tags: ['Subscriptions'] })
   .post('/upgrade', async (c) => {
     try {
       const user = (c as any).get?.('user');
