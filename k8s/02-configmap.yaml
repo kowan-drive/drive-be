@@ -8,10 +8,10 @@ data:
   PORT: "3001"
   NODE_ENV: "production"
   APP_URL: "https://api-vibecloud.andrewaryo.com"
-  FRONTEND_URL: "https://your-frontend-domain.com"
+  FRONTEND_URL: "https://vibecloud.andrewaryo.com"
   
   # CORS - separate multiple URLs with semicolon
-  PODS_APP_WHITELIST: "https://your-frontend-domain.com;https://another-domain.com"
+  PODS_APP_WHITELIST: "https://vibecloud.andrewaryo.com;https://another-domain.com"
   
   # MinIO config
   MINIO_ENDPOINT: "minio-service"

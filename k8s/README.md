@@ -176,8 +176,8 @@ kubectl create secret generic minidrive-secrets \
 Edit `k8s/02-configmap.yaml` if you have a frontend:
 
 ```yaml
-FRONTEND_URL: "https://your-frontend-domain.com"
-PODS_APP_WHITELIST: "https://your-frontend-domain.com"
+FRONTEND_URL: "https://vibecloud.andrewaryo.com"
+PODS_APP_WHITELIST: "https://vibecloud.andrewaryo.com"
 ```
 
 ---
