@@ -66,6 +66,9 @@ POSTGRES_DB="minidrive"
 MINIO_ROOT_USER="minioadmin"
 MINIO_ROOT_PASSWORD=$(openssl rand -base64 32 | tr -d '/' | cut -c1-32)
 
+GRAFANA_ADMIN_USER="admin"
+GRAFANA_ADMIN_PASSWORD=$(openssl rand -base64 32 | tr -d '/' | cut -c1-32)
+
 MASTER_ENCRYPTION_KEY=$(openssl rand -base64 48 | tr -d '/' | cut -c1-48)
 SESSION_SECRET=$(openssl rand -base64 32 | tr -d '/' | cut -c1-32)
 
@@ -76,11 +79,12 @@ print_info "Secrets generated successfully!"
 echo ""
 
 # Show (partial) generated secrets
-print_info "Preview of generated secrets (showing only first 8 characters):"
-echo "  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:0:8}..."
-echo "  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:0:8}..."
-echo "  MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY:0:8}..."
-echo "  SESSION_SECRET: ${SESSION_SECRET:0:8}..."
+print_info "Preview of generated secrets:"
+echo "  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}..."
+echo "  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}..."
+echo "  GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}..."
+echo "  MASTER_ENCRYPTION_KEY: ${MASTER_ENCRYPTION_KEY}..."
+echo "  SESSION_SECRET: ${SESSION_SECRET}..."
 echo ""
 
 # Ask if user wants to save to file for backup
@@ -92,14 +96,31 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 # MiniDrive Secrets - Generated on $(date)
 # KEEP THIS FILE SECURE AND DO NOT COMMIT TO GIT
 
+================================
+DATABASE CREDENTIALS
+================================
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=${POSTGRES_DB}
 DATABASE_URL=${DATABASE_URL}
 
+================================
+MINIO OBJECT STORAGE CREDENTIALS
+================================
+Login URL: http://minio-service:9001 (or via port-forward/ingress)
 MINIO_ROOT_USER=${MINIO_ROOT_USER}
 MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
 
+================================
+GRAFANA MONITORING CREDENTIALS
+================================
+Login URL: http://grafana-service:3000 (or via port-forward/ingress)
+GRAFANA_ADMIN_USER=${GRAFANA_ADMIN_USER}
+GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+
+================================
+APPLICATION SECRETS
+================================
 MASTER_ENCRYPTION_KEY=${MASTER_ENCRYPTION_KEY}
 SESSION_SECRET=${SESSION_SECRET}
 EOF
@@ -129,7 +150,7 @@ else
     print_step "Creating new secret..."
 fi
 
-# Create/Update Kubernetes secret
+# Create/Update Kubernetes secret for main application
 kubectl create secret generic minidrive-secrets \
   --namespace=minidrive \
   --from-literal=POSTGRES_USER="${POSTGRES_USER}" \
@@ -142,7 +163,31 @@ kubectl create secret generic minidrive-secrets \
   --from-literal=SESSION_SECRET="${SESSION_SECRET}" \
   --dry-run=client -o yaml | kubectl apply -f -
 
-print_info "Secret created/updated successfully in Kubernetes!"
+print_info "Main application secret created/updated successfully!"
+
+# Create/Update Grafana admin secret
+prDisplay all credentials clearly
+echo ""
+print_info "============================================"
+print_info "IMPORTANT: YOUR LOGIN CREDENTIALS"
+print_info "============================================"
+echo ""
+echo -e "${BLUE}MinIO Object Storage Console:${NC}"
+echo "  URL: http://minio-service:9001 (access via port-forward or ingress)"
+echo "  Username: ${MINIO_ROOT_USER}"
+echo "  Password: ${MINIO_ROOT_PASSWORD}"
+echo ""
+echo -e "${BLUE}Grafana Monitoring Dashboard:${NC}"
+echo "  URL: http://grafana-service:3000 (access via port-forward or ingress)"
+echo "  Username: ${GRAFANA_ADMIN_USER}"
+echo "  Password: ${GRAFANA_ADMIN_PASSWORD}"
+echo ""
+echo -e "${BLUE}PostgreSQL Database:${NC}"
+echo "  Username: ${POSTGRES_USER}"
+echo "  Password: ${POSTGRES_PASSWORD}"
+echo "  Database: ${POSTGRES_DB}"
+echo ""
+print_info "============================================"
 echo ""
 
 # Ask if user wants to restart deployments to pick up new secrets
@@ -152,10 +197,31 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     if kubectl get deployment minidrive-app -n minidrive &> /dev/null; then
         print_step "Restarting minidrive-app deployment..."
         kubectl rollout restart deployment/minidrive-app -n minidrive
-        print_info "Deployment restarted. Monitoring rollout..."
-        kubectl rollout status deployment/minidrive-app -n minidrive
-    else
-        print_warning "minidrive-app deployment not found. Skipping restart."
+    fi
+    if kubectl get deployment grafana -n minidrive &> /dev/null; then
+        print_step "Restarting grafana deployment..."
+        kubectl rollout restart deployment/grafana -n minidrive
+    fi
+    if kubectl get deployment minio -n minidrive &> /dev/null; then
+        print_step "Restarting minio deployment..."
+        kubectl rollout restart deployment/minio -n minidrive
+    fi
+    print_info "Deployments restarted. Waiting for rollout..."
+    sleep 3
+fi
+
+echo ""
+print_info "Setup complete!"
+echo ""
+print_warning "Remember to:"
+echo "  1. Store the credentials shown above in a secure password manager"
+echo "  2. Store the backup file (if created) in a secure location"
+echo "  3. Delete the local backup file after storing it securely"
+echo "  4. Never commit secrets to version control"
+echo ""
+print_info "To access services locally, use port-forward:"
+echo "  kubectl port-forward -n minidrive svc/grafana-service 3000:3000"
+echo "  kubectl port-forward -n minidrive svc/minio-service 9001:9001t found. Skipping restart."
     fi
 fi
 
