@@ -8,6 +8,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 20Gi
+      storage: 15Gi
   # Optional: Add storageClassName if your cluster has specific storage classes
-  # storageClassName: standard
+  # storageClassName: local-path  # k3s default
+

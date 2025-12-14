@@ -7,7 +7,7 @@ data:
   # Server config
   PORT: "3001"
   NODE_ENV: "production"
-  APP_URL: "https://your-domain.com"
+  APP_URL: "https://api-vibecloud.andrewaryo.com"
   FRONTEND_URL: "https://your-frontend-domain.com"
   
   # CORS - separate multiple URLs with semicolon
@@ -19,10 +19,10 @@ data:
   MINIO_USE_SSL: "false"
   MINIO_BUCKET_NAME: "minidrive-files"
   
-  # WebAuthn config (update with your domain)
+  # WebAuthn config
   WEBAUTHN_RP_NAME: "MiniDrive"
-  WEBAUTHN_RP_ID: "your-domain.com"
-  WEBAUTHN_ORIGIN: "https://your-domain.com"
+  WEBAUTHN_RP_ID: "andrewaryo.com"
+  WEBAUTHN_ORIGIN: "https://api-vibecloud.andrewaryo.com"
   
   # Session config
   SESSION_EXPIRY_HOURS: "168"

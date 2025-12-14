@@ -4,23 +4,16 @@ metadata:
   name: minidrive-ingress
   namespace: minidrive
   annotations:
-    # Uncomment and configure based on your ingress controller
-    # For Traefik:
-    # traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    # traefik.ingress.kubernetes.io/router.tls: "true"
+    # Traefik: Redirect HTTP to HTTPS
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+    traefik.ingress.kubernetes.io/redirect-permanent: "true"
     
-    # For nginx-ingress:
+    # Optional: For cert-manager with Traefik
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-    
-    # CORS headers (if needed, adjust based on your ingress controller)
-    # nginx.ingress.kubernetes.io/enable-cors: "true"
-    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://your-frontend-domain.com"
 spec:
-  ingressClassName: traefik  # Change to 'nginx' if using nginx-ingress
+  ingressClassName: traefik
   rules:
-  - host: api.your-domain.com  # UPDATE THIS
+  - host: api-vibecloud.andrewaryo.com
     http:
       paths:
       - path: /
@@ -33,7 +26,7 @@ spec:
   # Optional: Add TLS configuration
   # tls:
   # - hosts:
-  #   - api.your-domain.com
+  #   - api-vibecloud.andrewaryo.com
   #   secretName: minidrive-tls-cert
 ---
 # Optional: Ingress for MinIO Console (for admin access)
@@ -43,11 +36,12 @@ metadata:
   name: minio-console-ingress
   namespace: minidrive
   annotations:
-    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+    traefik.ingress.kubernetes.io/redirect-permanent: "true"
 spec:
-  ingressClassName: traefik  # Change to 'nginx' if using nginx-ingress
+  ingressClassName: traefik
   rules:
-  - host: minio-console.your-domain.com  # UPDATE THIS
+  - host: minio-vibecloud.andrewaryo.com
     http:
       paths:
       - path: /
@@ -59,7 +53,7 @@ spec:
               number: 9001
   # tls:
   # - hosts:
-  #   - minio-console.your-domain.com
+  #   - minio-vibecloud.andrewaryo.com
   #   secretName: minio-console-tls-cert
 ---
 # Ingress for Grafana (monitoring dashboard)
@@ -69,15 +63,15 @@ metadata:
   name: grafana-ingress
   namespace: minidrive
   annotations:
-    # For nginx-ingress:
-    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    # nginx.ingress.kubernetes.io/auth-type: basic
-    # nginx.ingress.kubernetes.io/auth-secret: grafana-auth
-    # nginx.ingress.kubernetes.io/auth-realm: 'Grafana Authentication Required'
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+    traefik.ingress.kubernetes.io/redirect-permanent: "true"
+    # Optional: For basic auth with Traefik
+    # traefik.ingress.kubernetes.io/auth-type: basic
+    # traefik.ingress.kubernetes.io/auth-secret: grafana-auth
 spec:
-  ingressClassName: traefik  # Change to 'nginx' if using nginx-ingress
+  ingressClassName: traefik
   rules:
-  - host: grafana.your-domain.com  # UPDATE THIS
+  - host: grafana-vibecloud.andrewaryo.com
     http:
       paths:
       - path: /
@@ -90,5 +84,5 @@ spec:
   # Optional: Add TLS configuration
   # tls:
   # - hosts:
-  #   - grafana.your-domain.com
+  #   - grafana-vibecloud.andrewaryo.com
   #   secretName: grafana-tls-cert

@@ -8,7 +8,7 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 3Gi
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -64,7 +64,7 @@ data:
 
     table_manager:
       retention_deletes_enabled: true
-      retention_period: 720h
+      retention_period: 360h
 
     compactor:
       working_directory: /loki/compactor
@@ -102,10 +102,10 @@ spec:
           mountPath: /loki
         resources:
           requests:
-            memory: "256Mi"
+            memory: "128Mi"
             cpu: "100m"
           limits:
-            memory: "1Gi"
+            memory: "512Mi"
             cpu: "500m"
         livenessProbe:
           httpGet:

@@ -4,7 +4,7 @@ metadata:
   name: minidrive-app
   namespace: minidrive
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: minidrive
@@ -99,11 +99,11 @@ spec:
           failureThreshold: 3
         resources:
           requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
             memory: "256Mi"
             cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
