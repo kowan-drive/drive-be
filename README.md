@@ -75,6 +75,32 @@ The `docker-compose.yml` includes:
 - **MinIO**: Object storage for encrypted files
 - **MinIO Console**: Web UI at `http://localhost:9001`
 
+## ☸️ Kubernetes Deployment
+
+For production deployment to Kubernetes, see the [k8s](./k8s/) folder:
+
+- **[Quick Start Guide](./k8s/QUICKSTART.md)** - Get started in 5 steps
+- **[Full Documentation](./k8s/README.md)** - Comprehensive deployment guide
+- **Helper Scripts**:
+  - `deploy.sh` - Automated initial deployment
+  - `rollout.sh` - Manage updates and rollbacks
+  - `setup-secrets.sh` - Generate and apply secure secrets
+
+Quick deployment:
+```bash
+cd k8s
+./setup-secrets.sh  # Generate secure secrets
+./deploy.sh         # Deploy to Kubernetes
+```
+
+The Kubernetes setup includes:
+- PostgreSQL with persistent storage (10Gi)
+- MinIO with persistent storage (20Gi)
+- Application with horizontal scaling (2+ replicas)
+- Ingress with TLS/HTTPS support
+- Health checks and rolling updates
+- Secure secret management
+
 ## 🏗️ Project Structure
 
 ```
@@ -126,9 +152,6 @@ Create test file and run:
 bun test
 ```
 
-## 📝 License
-
-[Your License]
 
 ## 🤝 Contributing
 

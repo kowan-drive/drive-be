@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minidrive-ingress
+  namespace: minidrive
+  annotations:
+    # Uncomment and configure based on your ingress controller
+    # For Traefik:
+    # traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # traefik.ingress.kubernetes.io/router.tls: "true"
+    
+    # For nginx-ingress:
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # CORS headers (if needed, adjust based on your ingress controller)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://your-frontend-domain.com"
+spec:
+  ingressClassName: traefik  # Change to 'nginx' if using nginx-ingress
+  rules:
+  - host: api.your-domain.com  # UPDATE THIS
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: minidrive-service
+            port:
+              number: 80
+  # Optional: Add TLS configuration
+  # tls:
+  # - hosts:
+  #   - api.your-domain.com
+  #   secretName: minidrive-tls-cert
+---
+# Optional: Ingress for MinIO Console (for admin access)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio-console-ingress
+  namespace: minidrive
+  annotations:
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: traefik  # Change to 'nginx' if using nginx-ingress
+  rules:
+  - host: minio-console.your-domain.com  # UPDATE THIS
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: minio-service
+            port:
+              number: 9001
+  # tls:
+  # - hosts:
+  #   - minio-console.your-domain.com
+  #   secretName: minio-console-tls-cert

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minidrive-config
+  namespace: minidrive
+data:
+  # Server config
+  PORT: "3001"
+  NODE_ENV: "production"
+  APP_URL: "https://your-domain.com"
+  FRONTEND_URL: "https://your-frontend-domain.com"
+  
+  # CORS - separate multiple URLs with semicolon
+  PODS_APP_WHITELIST: "https://your-frontend-domain.com;https://another-domain.com"
+  
+  # MinIO config
+  MINIO_ENDPOINT: "minio-service"
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_BUCKET_NAME: "minidrive-files"
+  
+  # WebAuthn config (update with your domain)
+  WEBAUTHN_RP_NAME: "MiniDrive"
+  WEBAUTHN_RP_ID: "your-domain.com"
+  WEBAUTHN_ORIGIN: "https://your-domain.com"
+  
+  # Session config
+  SESSION_EXPIRY_HOURS: "168"

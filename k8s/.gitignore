@@ -1,0 +1,11 @@
+# Ignore files with actual secrets
+secrets.env
+01-secret.yaml.local
+*-sealed.yaml.local
+
+# Ignore any backup files
+*.backup
+*.bak
+
+# Ignore local testing files
+*.local
