@@ -1,146 +1,122 @@
 # MiniDrive Kubernetes Deployment Guide
 
-This guide provides comprehensive instructions for deploying the MiniDrive backend application to Kubernetes.
+Complete guide for deploying MiniDrive backend to Kubernetes (k3s) with Traefik ingress, optimized for 8GB RAM and 60GB storage.
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Architecture Overview](#architecture-overview)
-3. [Environment Variables Setup](#environment-variables-setup)
-4. [Initial Deployment](#initial-deployment)
-5. [Updating Secrets Securely](#updating-secrets-securely)
-6. [Domain Configuration](#domain-configuration)
-7. [Rolling Updates](#rolling-updates)
-8. [Troubleshooting](#troubleshooting)
-9. [Scaling](#scaling)
-10. [Monitoring](#monitoring)
+- [Quick Start](#quick-start)
+- [Architecture Overview](#architecture-overview)
+- [Prerequisites](#prerequisites)
+- [Initial Setup](#initial-setup)
+- [Deployment](#deployment)
+- [Configuration Files](#configuration-files)
+- [Monitoring Stack](#monitoring-stack)
+- [Operations](#operations)
+- [Troubleshooting](#troubleshooting)
+- [Resource Management](#resource-management)
 
 ---
 
-## Prerequisites
+## Quick Start
 
-Before deploying, ensure you have:
-
-- A Kubernetes cluster (v1.24+)
-- `kubectl` configured to access your cluster
-- Docker registry access (Docker Hub, GitHub Container Registry, etc.)
-- Domain name(s) for your application
-- Ingress controller installed (Traefik or nginx-ingress)
-- (Optional) cert-manager for automatic TLS certificates
-
-### Verify cluster access:
+**For experienced users - 5 steps to deploy:**
 
 ```bash
-kubectl cluster-info
-kubectl get nodes
+# 1. Build and push your Docker image
+docker build -t your-registry/minidrive-app:v1.0.0 .
+docker push your-registry/minidrive-app:v1.0.0
+
+# 2. Update image reference in k8s/08-app-deployment.yaml
+# Change: image: your-docker-registry/minidrive-app:latest
+
+# 3. Setup secrets
+cd k8s
+./setup-secrets.sh
+
+# 4. Deploy everything
+./deploy.sh
+
+# 5. Configure DNS
+# Point api-vibecloud.andrewaryo.com and grafana-vibecloud.andrewaryo.com to your ingress IP
+```
+
+**Verify deployment:**
+```bash
+kubectl get all -n minidrive
+kubectl logs -f deployment/minidrive-app -n minidrive
 ```
 
 ---
 
 ## Architecture Overview
 
-The MiniDrive deployment consists of:
+### Components
 
-- **PostgreSQL**: Database for user data and metadata (1 replica)
-- **MinIO**: Object storage for file storage (1 replica)
-- **MiniDrive App**: Backend application (2 replicas by default)
-- **Services**: ClusterIP services for internal communication
-- **Ingress**: External access to the application and MinIO console
+The deployment includes:
 
-### Persistent Storage:
+- **PostgreSQL** (1 replica) - User data and metadata storage
+- **MinIO** (1 replica) - Object storage for files
+- **MiniDrive App** (1 replica) - Backend application
+- **Traefik Ingress** - External access (k3s default)
+- **Monitoring Stack** (optional):
+  - Prometheus - Metrics collection
+  - Loki - Log aggregation
+  - Tempo - Distributed tracing
+  - Grafana - Visualization dashboard
+  - Promtail - Log collection agent
 
-- PostgreSQL: 10Gi PVC
-- MinIO: 20Gi PVC
+### Resource Allocation
+
+**Optimized for 8GB RAM / 60GB Storage:**
+
+| Component | RAM Request | RAM Limit | Storage | CPU Request | CPU Limit |
+|-----------|-------------|-----------|---------|-------------|-----------|
+| App | 128Mi | 256Mi | - | 100m | 250m |
+| PostgreSQL | 128Mi | 256Mi | 5Gi | 100m | 250m |
+| MinIO | 128Mi | 512Mi | 15Gi | 100m | 500m |
+| **Monitoring:** | | | | | |
+| Prometheus | 256Mi | 1Gi | 5Gi | 100m | 500m |
+| Loki | 128Mi | 512Mi | 3Gi | 100m | 500m |
+| Tempo | 128Mi | 512Mi | 2Gi | 100m | 500m |
+| Grafana | 128Mi | 512Mi | 2Gi | 100m | 500m |
+| **Total** | **~1.2GB** | **~4.5GB** | **~32GB** | - | - |
+
+### Domains
+
+- **API**: `api-vibecloud.andrewaryo.com`
+- **Grafana**: `grafana-vibecloud.andrewaryo.com`
+- **MinIO Console**: `minio-vibecloud.andrewaryo.com` (optional)
+- **Prometheus**: `prometheus-vibecloud.andrewaryo.com` (optional)
 
 ---
 
-## Environment Variables Setup
+## Prerequisites
 
-### Step 1: Create a Secure Secrets File
+- **Kubernetes cluster**: v1.24+ (k3s recommended)
+- **kubectl** configured to access your cluster
+- **Docker** for building images
+- **Docker registry** access (Docker Hub, GitHub Container Registry, etc.)
+- **Domain names** pointing to your cluster
+- **8GB RAM** and **60GB storage** available
+- **Traefik** ingress controller (included with k3s)
 
-Create a file named `secrets.env` (DO NOT commit this to Git):
-
-```bash
-# PostgreSQL credentials
-POSTGRES_USER=minidrive
-POSTGRES_PASSWORD=$(openssl rand -base64 32)
-POSTGRES_DB=minidrive
-
-# MinIO credentials
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=$(openssl rand -base64 32)
-
-# Application secrets (at least 32 characters)
-MASTER_ENCRYPTION_KEY=$(openssl rand -base64 48)
-SESSION_SECRET=$(openssl rand -base64 32)
-```
-
-### Step 2: Generate Strong Secrets
-
-Run these commands to generate secure random secrets:
+### Verify Cluster
 
 ```bash
-echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)"
-echo "MINIO_ROOT_PASSWORD=$(openssl rand -base64 32)"
-echo "MASTER_ENCRYPTION_KEY=$(openssl rand -base64 48)"
-echo "SESSION_SECRET=$(openssl rand -base64 32)"
-```
-
-### Step 3: Add secrets.env to .gitignore
-
-```bash
-echo "secrets.env" >> .gitignore
-echo "k8s/01-secret.yaml" >> .gitignore  # If you edit this file with real secrets
-```
-
-### Step 4: Create Kubernetes Secret
-
-Method 1: Edit `01-secret.yaml` directly (then gitignore it):
-
-```bash
-# Edit the file with your generated secrets
-vim k8s/01-secret.yaml
-
-# Apply it
-kubectl apply -f k8s/01-secret.yaml
-```
-
-Method 2: Create secret from command line (recommended):
-
-```bash
-kubectl create secret generic minidrive-secrets \
-  --namespace=minidrive \
-  --from-literal=POSTGRES_USER='minidrive' \
-  --from-literal=POSTGRES_PASSWORD='YOUR_GENERATED_PASSWORD' \
-  --from-literal=POSTGRES_DB='minidrive' \
-  --from-literal=MINIO_ROOT_USER='minioadmin' \
-  --from-literal=MINIO_ROOT_PASSWORD='YOUR_GENERATED_PASSWORD' \
-  --from-literal=MASTER_ENCRYPTION_KEY='YOUR_GENERATED_KEY' \
-  --from-literal=SESSION_SECRET='YOUR_GENERATED_SECRET' \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
-### Step 5: Update ConfigMap with Your Domain
-
-Edit `k8s/02-configmap.yaml` and update:
-
-```yaml
-APP_URL: "https://api.your-domain.com"
-FRONTEND_URL: "https://your-frontend-domain.com"
-PODS_APP_WHITELIST: "https://your-frontend-domain.com"
-WEBAUTHN_RP_ID: "your-domain.com"
-WEBAUTHN_ORIGIN: "https://api.your-domain.com"
+kubectl cluster-info
+kubectl get nodes
+kubectl get ingressclass  # Should show 'traefik'
 ```
 
 ---
 
-## Initial Deployment
+## Initial Setup
 
-### Step 1: Build and Push Docker Image
+### 1. Build and Push Docker Image
 
 ```bash
 # Navigate to drive-be directory
-cd drive-be
+cd /path/to/drive-be
 
 # Build the Docker image
 docker build -t your-registry/minidrive-app:v1.0.0 .
@@ -153,115 +129,122 @@ docker tag your-registry/minidrive-app:v1.0.0 your-registry/minidrive-app:latest
 docker push your-registry/minidrive-app:latest
 ```
 
-### Step 2: Update Image References
+### 2. Update Image References
 
-Edit `k8s/08-app-deployment.yaml` and replace:
-
-```yaml
-image: your-docker-registry/minidrive-app:latest
-```
-
-with your actual image:
+Edit `k8s/08-app-deployment.yaml` (lines 49 and 72):
 
 ```yaml
-image: your-registry/minidrive-app:latest
+image: your-registry/minidrive-app:latest  # Update this
 ```
 
-### Step 3: Apply Kubernetes Manifests
+### 3. Setup Secrets
+
+**Option A: Automated (Recommended)**
 
 ```bash
-# Navigate to k8s directory
+cd k8s
+./setup-secrets.sh
+```
+
+**Option B: Manual**
+
+```bash
+# Generate secrets
+POSTGRES_PWD=$(openssl rand -base64 32)
+MINIO_PWD=$(openssl rand -base64 32)
+ENCRYPTION_KEY=$(openssl rand -base64 48)
+SESSION_SECRET=$(openssl rand -base64 32)
+
+# Create Kubernetes secret
+kubectl create secret generic minidrive-secrets \
+  --namespace=minidrive \
+  --from-literal=POSTGRES_USER='minidrive' \
+  --from-literal=POSTGRES_PASSWORD="${POSTGRES_PWD}" \
+  --from-literal=POSTGRES_DB='minidrive' \
+  --from-literal=DATABASE_URL="postgresql://minidrive:${POSTGRES_PWD}@postgres-service:5432/minidrive?schema=public" \
+  --from-literal=MINIO_ROOT_USER='minioadmin' \
+  --from-literal=MINIO_ROOT_PASSWORD="${MINIO_PWD}" \
+  --from-literal=MASTER_ENCRYPTION_KEY="${ENCRYPTION_KEY}" \
+  --from-literal=SESSION_SECRET="${SESSION_SECRET}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+**Save your passwords securely!**
+
+### 4. Configure Frontend URL (Optional)
+
+Edit `k8s/02-configmap.yaml` if you have a frontend:
+
+```yaml
+FRONTEND_URL: "https://your-frontend-domain.com"
+PODS_APP_WHITELIST: "https://your-frontend-domain.com"
+```
+
+---
+
+## Deployment
+
+### Automated Deployment
+
+```bash
+cd k8s
+./deploy.sh
+```
+
+### Manual Deployment
+
+```bash
 cd k8s
 
-# Apply in order (important!)
+# Apply in order
 kubectl apply -f 00-namespace.yaml
-kubectl apply -f 01-secret.yaml  # Or skip if you used kubectl create secret
 kubectl apply -f 02-configmap.yaml
 kubectl apply -f 03-postgres-pvc.yaml
 kubectl apply -f 04-minio-pvc.yaml
 kubectl apply -f 05-postgres-deployment.yaml
 kubectl apply -f 06-minio-deployment.yaml
 
-# Wait for databases to be ready (about 30-60 seconds)
+# Wait for databases
 kubectl wait --for=condition=ready pod -l app=postgres -n minidrive --timeout=120s
 kubectl wait --for=condition=ready pod -l app=minio -n minidrive --timeout=120s
 
-# Create MinIO bucket
+# Initialize MinIO bucket
 kubectl apply -f 07-minio-init-job.yaml
-
-# Wait for job to complete
 kubectl wait --for=condition=complete job/minio-init -n minidrive --timeout=120s
 
-# Deploy the application
+# Deploy application
 kubectl apply -f 08-app-deployment.yaml
-
-# Wait for app to be ready
 kubectl wait --for=condition=ready pod -l app=minidrive -n minidrive --timeout=180s
 
-# Apply ingress (after configuring domain)
+# Apply ingress
 kubectl apply -f 09-ingress.yaml
 ```
 
-### Step 4: Verify Deployment
+### DNS Configuration
+
+Get your ingress IP:
 
 ```bash
-# Check all resources
-kubectl get all -n minidrive
-
-# Check pod status
-kubectl get pods -n minidrive
-
-# Check logs if there are issues
-kubectl logs -f deployment/minidrive-app -n minidrive
-
-# Check PostgreSQL
-kubectl logs -f deployment/postgres -n minidrive
-
-# Check MinIO
-kubectl logs -f deployment/minio -n minidrive
-```
-
----
-
-## Domain Configuration
-
-### Step 1: Configure DNS
-
-Point your domain to your Kubernetes cluster's ingress IP:
-
-```bash
-# Get ingress IP
 kubectl get ingress -n minidrive
-
-# Or get LoadBalancer IP
-kubectl get svc -n ingress-nginx  # For nginx-ingress
-kubectl get svc -n kube-system traefik  # For Traefik
+# or
+kubectl get svc -n kube-system traefik
 ```
 
 Create DNS A records:
-- `api.your-domain.com` → Ingress IP
-- `minio-console.your-domain.com` → Ingress IP (optional)
+- `api-vibecloud.andrewaryo.com` → Ingress IP
+- `grafana-vibecloud.andrewaryo.com` → Ingress IP
+- `minio-vibecloud.andrewaryo.com` → Ingress IP (optional)
 
-### Step 2: Update Ingress Configuration
+### TLS/HTTPS Setup (Recommended)
 
-Edit `k8s/09-ingress.yaml`:
-
-```yaml
-spec:
-  rules:
-  - host: api.your-domain.com  # Your actual domain
-```
-
-### Step 3: Configure TLS (HTTPS)
-
-#### Option A: Using cert-manager (Automated)
+**Using cert-manager:**
 
 ```bash
-# Install cert-manager (if not already installed)
+# Install cert-manager (if not installed)
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
 
-# Create ClusterIssuer for Let's Encrypt
-cat <<EOF | kubectl apply -f -
+# Create Let's Encrypt issuer
+kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -269,325 +252,51 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com  # UPDATE THIS
+    email: your-email@example.com
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
     - http01:
         ingress:
-          class: nginx  # or traefik
+          class: traefik
 EOF
 ```
 
-Update `09-ingress.yaml` with cert-manager annotations:
-
-```yaml
-metadata:
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-spec:
-  tls:
-  - hosts:
-    - api.your-domain.com
-    secretName: minidrive-tls-cert
-```
-
-#### Option B: Using Existing Certificate
-
-```bash
-# Create TLS secret from your certificate files
-kubectl create secret tls minidrive-tls-cert \
-  --namespace=minidrive \
-  --cert=path/to/tls.crt \
-  --key=path/to/tls.key
-```
-
-### Step 4: Apply Updated Ingress
-
-```bash
-kubectl apply -f k8s/09-ingress.yaml
-```
+Uncomment TLS sections in ingress files (`09-ingress.yaml`, `18-monitoring-ingress.yaml`) and apply.
 
 ---
 
-## Rolling Updates
+## Configuration Files
 
-### Step 1: Build New Version
+### Deployment Order
 
-```bash
-# Build new version
-docker build -t your-registry/minidrive-app:v1.1.0 .
-docker push your-registry/minidrive-app:v1.1.0
+1. `00-namespace.yaml` - Creates `minidrive` namespace
+2. `01-secret.yaml` - Sensitive credentials (use `setup-secrets.sh` instead)
+3. `02-configmap.yaml` - Non-sensitive configuration
+4. `03-postgres-pvc.yaml` - PostgreSQL storage (5Gi)
+5. `04-minio-pvc.yaml` - MinIO storage (15Gi)
+6. `05-postgres-deployment.yaml` - PostgreSQL database
+7. `06-minio-deployment.yaml` - MinIO object storage
+8. `07-minio-init-job.yaml` - MinIO bucket initialization
+9. `08-app-deployment.yaml` - MiniDrive application (1 replica)
+10. `09-ingress.yaml` - Traefik ingress for API, MinIO, and Grafana
 
-# Update latest tag
-docker tag your-registry/minidrive-app:v1.1.0 your-registry/minidrive-app:latest
-docker push your-registry/minidrive-app:latest
-```
+### Helper Scripts
 
-### Step 2: Update Deployment
-
-```bash
-# Force rollout with new image
-kubectl rollout restart deployment/minidrive-app -n minidrive
-
-# Or update image directly
-kubectl set image deployment/minidrive-app \
-  app=your-registry/minidrive-app:v1.1.0 \
-  -n minidrive
-```
-
-### Step 3: Monitor Rollout
-
-```bash
-# Watch rollout status
-kubectl rollout status deployment/minidrive-app -n minidrive
-
-# Check rollout history
-kubectl rollout history deployment/minidrive-app -n minidrive
-
-# View pods updating
-kubectl get pods -n minidrive -w
-```
-
-### Step 4: Rollback if Needed
-
-```bash
-# Rollback to previous version
-kubectl rollout undo deployment/minidrive-app -n minidrive
-
-# Rollback to specific revision
-kubectl rollout undo deployment/minidrive-app --to-revision=2 -n minidrive
-```
+- **`deploy.sh`** - Automated initial deployment
+- **`rollout.sh`** - Manage updates and rollbacks
+- **`setup-secrets.sh`** - Generate and apply secure secrets
 
 ---
 
-## Updating Secrets Securely
+## Monitoring Stack
 
-### Method 1: Using kubectl (Recommended)
-
-```bash
-# Update a single secret value
-kubectl create secret generic minidrive-secrets \
-  --namespace=minidrive \
-  --from-literal=SESSION_SECRET='new-secret-value' \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# Restart pods to pick up new secrets
-kubectl rollout restart deployment/minidrive-app -n minidrive
-```
-
-### Method 2: Using Sealed Secrets (Advanced)
-
-For production, consider using [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets):
-
-```bash
-# Install Sealed Secrets controller
-kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
-
-# Create sealed secret
-kubeseal --format=yaml < 01-secret.yaml > 01-secret-sealed.yaml
-
-# Commit sealed secret (safe to commit)
-git add k8s/01-secret-sealed.yaml
-git commit -m "Add sealed secrets"
-```
-
-### Method 3: External Secrets Operator
-
-For cloud providers, use [External Secrets Operator](https://external-secrets.io/) to sync from:
-- AWS Secrets Manager
-- Google Secret Manager
-- Azure Key Vault
-- HashiCorp Vault
-
----
-
-## Troubleshooting
-
-### Check Pod Status
-
-```bash
-# Get pod status
-kubectl get pods -n minidrive
-
-# Describe pod for events
-kubectl describe pod <pod-name> -n minidrive
-
-# Check logs
-kubectl logs <pod-name> -n minidrive
-kubectl logs -f deployment/minidrive-app -n minidrive
-kubectl logs <pod-name> -n minidrive --previous  # Previous container logs
-```
-
-### Common Issues
-
-#### 1. ImagePullBackOff
-
-```bash
-# Check if image exists and registry access
-docker pull your-registry/minidrive-app:latest
-
-# If using private registry, create imagePullSecret
-kubectl create secret docker-registry regcred \
-  --docker-server=your-registry \
-  --docker-username=your-username \
-  --docker-password=your-password \
-  --namespace=minidrive
-
-# Add to deployment:
-# spec:
-#   template:
-#     spec:
-#       imagePullSecrets:
-#       - name: regcred
-```
-
-#### 2. CrashLoopBackOff
-
-```bash
-# Check application logs
-kubectl logs -f deployment/minidrive-app -n minidrive
-
-# Common causes:
-# - Missing environment variables
-# - Database connection issues
-# - MinIO connection issues
-
-# Check if databases are ready
-kubectl get pods -n minidrive
-```
-
-#### 3. Database Connection Issues
-
-```bash
-# Test PostgreSQL connection from app pod
-kubectl exec -it deployment/minidrive-app -n minidrive -- sh
-nc -zv postgres-service 5432
-
-# Check PostgreSQL logs
-kubectl logs deployment/postgres -n minidrive
-
-# Verify secret values
-kubectl get secret minidrive-secrets -n minidrive -o jsonpath='{.data.POSTGRES_USER}' | base64 -d
-```
-
-#### 4. MinIO Connection Issues
-
-```bash
-# Check MinIO status
-kubectl logs deployment/minio -n minidrive
-
-# Test MinIO connectivity
-kubectl exec -it deployment/minidrive-app -n minidrive -- sh
-nc -zv minio-service 9000
-
-# Check bucket creation job
-kubectl logs job/minio-init -n minidrive
-```
-
-#### 5. Ingress Not Working
-
-```bash
-# Check ingress status
-kubectl get ingress -n minidrive
-kubectl describe ingress minidrive-ingress -n minidrive
-
-# Check ingress controller logs
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
-# or for Traefik:
-kubectl logs -n kube-system deployment/traefik
-
-# Verify DNS resolution
-nslookup api.your-domain.com
-```
-
-### Debug Commands
-
-```bash
-# Get all events in namespace
-kubectl get events -n minidrive --sort-by='.lastTimestamp'
-
-# Execute commands in pod
-kubectl exec -it deployment/minidrive-app -n minidrive -- sh
-
-# Port forward for local testing
-kubectl port-forward -n minidrive deployment/minidrive-app 3001:3001
-kubectl port-forward -n minidrive deployment/minio 9001:9001
-
-# Check resource usage
-kubectl top pods -n minidrive
-kubectl top nodes
-```
-
----
-
-## Scaling
-
-### Horizontal Scaling (More Replicas)
-
-```bash
-# Scale application
-kubectl scale deployment/minidrive-app --replicas=5 -n minidrive
-
-# Or edit deployment
-kubectl edit deployment/minidrive-app -n minidrive
-# Change: spec.replicas: 5
-
-# Auto-scaling with HPA
-kubectl autoscale deployment minidrive-app \
-  --cpu-percent=70 \
-  --min=2 \
-  --max=10 \
-  -n minidrive
-```
-
-### Vertical Scaling (More Resources)
-
-Edit `08-app-deployment.yaml`:
-
-```yaml
-resources:
-  requests:
-    memory: "512Mi"
-    cpu: "500m"
-  limits:
-    memory: "1Gi"
-    cpu: "1000m"
-```
-
-Apply changes:
-
-```bash
-kubectl apply -f k8s/08-app-deployment.yaml
-```
-
-### Storage Scaling
-
-```bash
-# For PostgreSQL
-kubectl edit pvc postgres-pvc -n minidrive
-# Increase storage size (if storage class supports it)
-
-# For MinIO
-kubectl edit pvc minio-pvc -n minidrive
-```
-
----
-
-## Monitoring
-
-### Full Monitoring Stack
-
-MiniDrive includes a complete monitoring stack with Prometheus, Loki, Tempo, and Grafana.
-
-**See [MONITORING.md](./MONITORING.md) for complete documentation.**
-
-Quick setup:
+### Deployment
 
 ```bash
 cd k8s
 
-# Deploy monitoring stack
+# Deploy monitoring components
 kubectl apply -f 10-prometheus-configmap.yaml
 kubectl apply -f 11-prometheus-deployment.yaml
 kubectl apply -f 12-loki-deployment.yaml
@@ -598,7 +307,7 @@ kubectl apply -f 17-grafana-dashboards.yaml
 kubectl apply -f 16-grafana-deployment.yaml
 kubectl apply -f 18-monitoring-ingress.yaml
 
-# Set Grafana admin password
+# Set Grafana password
 GRAFANA_PASSWORD=$(openssl rand -base64 32)
 kubectl create secret generic grafana-admin \
   --namespace=minidrive \
@@ -609,99 +318,287 @@ kubectl create secret generic grafana-admin \
 echo "Grafana password: ${GRAFANA_PASSWORD}"
 ```
 
-**Access Grafana**: `https://grafana.your-domain.com` (after configuring ingress)
+### Access Grafana
 
-**Pre-built Dashboard**: "MiniDrive Monitoring Dashboard" includes:
-- CPU and Memory usage
-- HTTP request metrics
+URL: `https://grafana-vibecloud.andrewaryo.com`
+
+**Login:**
+- Username: `admin`
+- Password: (from setup step above)
+
+### Pre-built Dashboard
+
+Navigate to **Dashboards** → **MiniDrive Monitoring Dashboard**
+
+**Includes:**
+- Application CPU & memory usage
+- HTTP request metrics & latency
+- PostgreSQL & MinIO pod status
 - Storage usage
-- Application logs
-- Distributed traces
+- Application logs (from Loki)
+- Distributed traces (from Tempo)
 
-### Basic Monitoring (Without Full Stack)
+### Monitoring Features
+
+**Prometheus** (15-day retention):
+- Metrics from all pods
+- Container resource usage
+- Kubernetes cluster metrics
+
+**Loki** (15-day retention):
+- Centralized logging
+- Pod log aggregation
+- LogQL query interface
+
+**Tempo**:
+- Distributed tracing via OTLP
+- Trace-to-log correlation
+
+**Promtail**:
+- DaemonSet log collector
+- Automatic pod discovery
+
+### Resource Tuning
+
+If monitoring uses too many resources, you can:
+
+1. **Reduce retention periods** in config files
+2. **Disable unused components** (e.g., Tempo if not using traces)
+3. **Lower resource limits** further in deployment files
+
+---
+
+## Operations
+
+### View Logs
 
 ```bash
-# Watch pod status
-kubectl get pods -n minidrive -w
+# Application logs
+kubectl logs -f deployment/minidrive-app -n minidrive
 
-# Check resource usage
-kubectl top pods -n minidrive
-kubectl top nodes
+# PostgreSQL logs
+kubectl logs deployment/postgres -n minidrive
 
-# View logs
-kubectl logs -f deployment/minidrive-app -n minidrive --tail=100
+# MinIO logs
+kubectl logs deployment/minio -n minidrive
+
+# All pods
+kubectl get pods -n minidrive
+kubectl logs <pod-name> -n minidrive
 ```
 
-### Application Health Checks
-
-The deployment includes:
-- **Liveness Probe**: Restarts unhealthy pods
-- **Readiness Probe**: Removes pod from service if not ready
-
-Check probe status:
+### Restart Application
 
 ```bash
-kubectl describe pod <pod-name> -n minidrive | grep -A 10 "Conditions:"
+./rollout.sh restart
+# or
+kubectl rollout restart deployment/minidrive-app -n minidrive
+```
+
+### Update to New Version
+
+```bash
+# Build and push new version
+docker build -t your-registry/minidrive-app:v1.1.0 .
+docker push your-registry/minidrive-app:v1.1.0
+
+# Deploy
+./rollout.sh update v1.1.0
+# or
+kubectl set image deployment/minidrive-app app=your-registry/minidrive-app:v1.1.0 -n minidrive
+kubectl rollout status deployment/minidrive-app -n minidrive
+```
+
+### Rollback
+
+```bash
+./rollout.sh undo
+# or
+kubectl rollout undo deployment/minidrive-app -n minidrive
+```
+
+### Scaling
+
+**Note:** Due to RAM constraints, scaling beyond 1 replica may cause resource issues.
+
+```bash
+# Scale to 2 replicas (check RAM usage first!)
+kubectl scale deployment/minidrive-app --replicas=2 -n minidrive
+
+# Monitor resource usage
+kubectl top pods -n minidrive
+kubectl top nodes
+```
+
+### Update Secrets
+
+```bash
+./setup-secrets.sh
+# Then restart pods
+kubectl rollout restart deployment/minidrive-app -n minidrive
 ```
 
 ---
 
-## Backup and Restore
+## Troubleshooting
 
-### Backup PostgreSQL
+### Check Pod Status
 
 ```bash
-# Create backup
-kubectl exec deployment/postgres -n minidrive -- \
-  pg_dump -U minidrive minidrive > backup-$(date +%Y%m%d).sql
-
-# Or run backup job
-cat <<EOF | kubectl apply -f -
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: postgres-backup
-  namespace: minidrive
-spec:
-  schedule: "0 2 * * *"  # Daily at 2 AM
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          containers:
-          - name: backup
-            image: postgres:16-alpine
-            env:
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: minidrive-secrets
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: minidrive-secrets
-                  key: POSTGRES_PASSWORD
-            command:
-            - sh
-            - -c
-            - |
-              pg_dump -h postgres-service -U \$POSTGRES_USER minidrive > /backup/backup-\$(date +\%Y\%m\%d-\%H\%M).sql
-            volumeMounts:
-            - name: backup-storage
-              mountPath: /backup
-          restartPolicy: OnFailure
-          volumes:
-          - name: backup-storage
-            persistentVolumeClaim:
-              claimName: backup-pvc  # Create this PVC
-EOF
+kubectl get pods -n minidrive
+kubectl describe pod <pod-name> -n minidrive
+kubectl logs <pod-name> -n minidrive
+kubectl logs <pod-name> -n minidrive --previous  # Previous crashed container
 ```
 
-### Restore PostgreSQL
+### Common Issues
+
+#### 1. ImagePullBackOff
 
 ```bash
-# Restore from backup
+# Check if image exists
+docker pull your-registry/minidrive-app:latest
+
+# For private registries, create secret
+kubectl create secret docker-registry regcred \
+  --docker-server=your-registry \
+  --docker-username=your-username \
+  --docker-password=your-password \
+  --namespace=minidrive
+
+# Add to deployment spec.template.spec.imagePullSecrets
+```
+
+#### 2. CrashLoopBackOff
+
+```bash
+# Check logs
+kubectl logs -f deployment/minidrive-app -n minidrive
+
+# Common causes:
+# - Database not ready (check postgres logs)
+# - MinIO not ready (check minio logs)
+# - Missing environment variables
+# - Incorrect DATABASE_URL
+```
+
+#### 3. OOMKilled (Out of Memory)
+
+```bash
+# Check resource usage
+kubectl top pods -n minidrive
+
+# Reduce other components or increase node RAM
+# Consider disabling monitoring stack temporarily
+```
+
+#### 4. Ingress Not Working
+
+```bash
+# Check ingress status
+kubectl get ingress -n minidrive
+kubectl describe ingress minidrive-ingress -n minidrive
+
+# Check Traefik logs (k3s)
+kubectl logs -n kube-system -l app.kubernetes.io/name=traefik
+
+# Verify DNS
+nslookup api-vibecloud.andrewaryo.com
+```
+
+#### 5. Storage Issues
+
+```bash
+# Check PVC status
+kubectl get pvc -n minidrive
+
+# Check storage class (k3s uses 'local-path' by default)
+kubectl get storageclass
+
+# Check available storage on node
+df -h
+```
+
+### Port Forwarding (Local Testing)
+
+```bash
+# Test application locally
+kubectl port-forward -n minidrive deployment/minidrive-app 3001:3001
+# Visit http://localhost:3001
+
+# MinIO console
+kubectl port-forward -n minidrive deployment/minio 9001:9001
+
+# Grafana
+kubectl port-forward -n minidrive deployment/grafana 3000:3000
+```
+
+### View Events
+
+```bash
+kubectl get events -n minidrive --sort-by='.lastTimestamp'
+```
+
+### Access Pod Shell
+
+```bash
+kubectl exec -it deployment/minidrive-app -n minidrive -- sh
+```
+
+---
+
+## Resource Management
+
+### Current Allocation
+
+**Total Storage:** ~32GB (out of 60GB available)
+- PostgreSQL: 5Gi
+- MinIO: 15Gi
+- Prometheus: 5Gi
+- Loki: 3Gi
+- Tempo: 2Gi
+- Grafana: 2Gi
+
+**Total RAM (Requests):** ~1.2GB (out of 8GB available)
+**Total RAM (Limits):** ~4.5GB (out of 8GB available)
+
+### Optimization Tips
+
+**If running low on RAM:**
+1. Disable monitoring stack (saves ~1GB)
+2. Reduce app/postgres/minio limits further
+3. Monitor with `kubectl top` frequently
+
+**If running low on storage:**
+1. Reduce retention periods (Prometheus, Loki)
+2. Reduce PVC sizes (requires recreating PVCs)
+3. Disable Tempo (uses 2Gi)
+
+### Monitoring Resource Usage
+
+```bash
+# Node resources
+kubectl top nodes
+
+# Pod resources
+kubectl top pods -n minidrive
+
+# PVC usage (requires metrics-server)
+kubectl get pvc -n minidrive
+```
+
+### Backup and Restore
+
+**Backup PostgreSQL:**
+
+```bash
+kubectl exec deployment/postgres -n minidrive -- \
+  pg_dump -U minidrive minidrive > backup-$(date +%Y%m%d).sql
+```
+
+**Restore PostgreSQL:**
+
+```bash
 kubectl exec -i deployment/postgres -n minidrive -- \
   psql -U minidrive minidrive < backup-20241214.sql
 ```
@@ -710,42 +607,33 @@ kubectl exec -i deployment/postgres -n minidrive -- \
 
 ## Security Best Practices
 
-1. **Never commit secrets to Git**
-   - Use `.gitignore` for `secrets.env` and edited secret files
-   - Use Sealed Secrets or External Secrets Operator
-
-2. **Use strong secrets**
-   - Generate with `openssl rand -base64 32` or similar
-   - Minimum 32 characters for encryption keys
-
-3. **Enable RBAC**
-   - Create service accounts with minimal permissions
-   - Use NetworkPolicies to restrict pod communication
-
-4. **Regular Updates**
-   - Keep images updated
-   - Monitor security advisories
-
-5. **TLS Everywhere**
-   - Enable TLS for ingress
-   - Consider service mesh for internal TLS
+1. **Never commit secrets** - Use `.gitignore` for `secrets.env` and modified secret files
+2. **Use strong passwords** - Generated by `setup-secrets.sh` (32+ characters)
+3. **Enable TLS/HTTPS** - Use cert-manager for automated certificates
+4. **Rotate secrets regularly** - Use `setup-secrets.sh` to update
+5. **Limit ingress access** - Consider using basic auth or VPN
+6. **Keep images updated** - Regularly rebuild and update application images
+7. **Monitor security advisories** - Watch for CVEs in base images
 
 ---
 
-## Clean Up
+## Cleanup
 
-To remove the entire deployment:
+**Delete everything:**
 
 ```bash
-# Delete all resources
-kubectl delete -f k8s/
-
-# Or delete namespace (deletes everything)
+# Delete namespace (removes all resources)
 kubectl delete namespace minidrive
 
-# Note: PVCs may need manual deletion if using retain policy
+# Or delete individually
+kubectl delete -f k8s/
+```
+
+**Manual PVC deletion (if needed):**
+
+```bash
 kubectl get pvc -n minidrive
-kubectl delete pvc <pvc-name> -n minidrive
+kubectl delete pvc postgres-pvc minio-pvc -n minidrive
 ```
 
 ---
@@ -758,46 +646,69 @@ kubectl delete pvc <pvc-name> -n minidrive
 # View all resources
 kubectl get all -n minidrive
 
+# View logs (follow)
+kubectl logs -f deployment/minidrive-app -n minidrive
+
 # Restart deployment
 kubectl rollout restart deployment/minidrive-app -n minidrive
 
-# View logs
-kubectl logs -f deployment/minidrive-app -n minidrive
-
-# Scale
-kubectl scale deployment/minidrive-app --replicas=3 -n minidrive
+# Scale deployment
+kubectl scale deployment/minidrive-app --replicas=2 -n minidrive
 
 # Execute command in pod
 kubectl exec -it deployment/minidrive-app -n minidrive -- sh
 
-# Port forward
+# Port forward for local access
 kubectl port-forward -n minidrive svc/minidrive-service 3001:80
 ```
 
-### File Order for Deployment
+### Environment Variables
 
-1. `00-namespace.yaml` - Namespace
-2. `01-secret.yaml` - Secrets
-3. `02-configmap.yaml` - Configuration
-4. `03-postgres-pvc.yaml` - PostgreSQL storage
-5. `04-minio-pvc.yaml` - MinIO storage
-6. `05-postgres-deployment.yaml` - PostgreSQL database
-7. `06-minio-deployment.yaml` - MinIO object storage
-8. `07-minio-init-job.yaml` - MinIO bucket initialization
-9. `08-app-deployment.yaml` - Application
-10. `09-ingress.yaml` - External access
+**From ConfigMap (`02-configmap.yaml`):**
+- `PORT`, `NODE_ENV`, `APP_URL`, `FRONTEND_URL`
+- `MINIO_ENDPOINT`, `MINIO_PORT`, `MINIO_BUCKET_NAME`
+- `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN`
+
+**From Secret (via `setup-secrets.sh`):**
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`
+- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`
+- `MASTER_ENCRYPTION_KEY`, `SESSION_SECRET`
+
+### Port Mapping
+
+| Service | Internal Port | External Access |
+|---------|--------------|-----------------|
+| App | 3001 | Via Traefik ingress (80/443) |
+| PostgreSQL | 5432 | Internal only (ClusterIP) |
+| MinIO API | 9000 | Internal only (ClusterIP) |
+| MinIO Console | 9001 | Via Traefik ingress (optional) |
+| Grafana | 3000 | Via Traefik ingress (80/443) |
+| Prometheus | 9090 | Via Traefik ingress (optional) |
+| Loki | 3100 | Internal only (ClusterIP) |
+| Tempo | 3200 | Internal only (ClusterIP) |
+
+---
+
+## K3s Specific Notes
+
+- **Traefik** is the default ingress controller (no need to install)
+- **local-path** is the default storage class (dynamic provisioning)
+- **Lightweight** design perfect for 8GB RAM constraint
+- **Single-node** deployment works well with this configuration
 
 ---
 
 ## Support
 
-For issues or questions:
-- Check application logs: `kubectl logs -f deployment/minidrive-app -n minidrive`
-- Review troubleshooting section above
-- Check Kubernetes events: `kubectl get events -n minidrive`
+For issues:
+1. Check logs: `kubectl logs -f deployment/minidrive-app -n minidrive`
+2. Check events: `kubectl get events -n minidrive`
+3. Review this troubleshooting guide
+4. Check Grafana dashboards (if monitoring enabled)
 
 ---
 
-**Last Updated**: December 2024
-**Kubernetes Version**: 1.24+
-**Application**: MiniDrive Backend
+**Last Updated**: December 2024  
+**Kubernetes Version**: 1.24+ (k3s compatible)  
+**Ingress**: Traefik  
+**Optimized for**: 8GB RAM / 60GB Storage
