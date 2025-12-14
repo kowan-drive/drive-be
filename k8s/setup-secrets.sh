@@ -184,9 +184,25 @@ print_info "Grafana admin secret created/updated successfully!"
 # Automatically restart Grafana to pick up new credentials
 if kubectl get deployment grafana -n minidrive &> /dev/null; then
     print_step "Restarting Grafana to apply new credentials..."
-    kubectl rollout restart deployment/grafana -n minidrive
-    print_info "Waiting for Grafana to be ready..."
-    kubectl rollout status deployment/grafana -n minidrive --timeout=120s || print_warning "Grafana restart taking longer than expected"
+    print_warning "Grafana's admin password is set on first startup and stored in its database."
+    print_warning "To apply new credentials, we need to reset Grafana's database."
+    read -p "Do you want to DELETE Grafana's data and restart with new credentials? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Delete the pod to stop it
+        kubectl delete pod -l app=grafana -n minidrive 2>/dev/null || true
+        # Delete the PVC to remove stored data
+        kubectl delete pvc grafana-pvc -n minidrive 2>/dev/null || true
+        print_info "Grafana data deleted. Recreating..."
+        # Recreate the PVC
+        kubectl apply -f 16-grafana-deployment.yaml
+        print_info "Waiting for Grafana to be ready with new credentials..."
+        kubectl wait --for=condition=ready pod -l app=grafana -n minidrive --timeout=180s || print_warning "Grafana taking longer than expected to start"
+    else
+        print_warning "Skipping Grafana reset. Old credentials will still be active."
+        print_info "To manually reset Grafana password, run:"
+        echo "  kubectl exec -it -n minidrive deployment/grafana -- grafana-cli admin reset-admin-password \${NEW_PASSWORD}"
+    fi
 fi
 echo ""
 
