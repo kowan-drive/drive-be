@@ -81,7 +81,7 @@ spec:
             name: minidrive-secrets
         livenessProbe:
           httpGet:
-            path: /
+            path: /api/v1
             port: 3001
           initialDelaySeconds: 30
           periodSeconds: 10
@@ -89,7 +89,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /
+            path: /api/v1
             port: 3001
           initialDelaySeconds: 10
           periodSeconds: 5
