@@ -139,15 +139,15 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     
     # Grafana
     print_info "Deploying Grafana..."
-    kubectl apply -f 14-grafana-datasources.yaml
-    kubectl apply -f 15-grafana-dashboard.yaml
-    kubectl apply -f 16-grafana-deployment.yaml
+    sudo kubectl apply -f 14-grafana-datasources.yaml
+    sudo kubectl apply -f 15-grafana-dashboard.yaml
+    sudo kubectl apply -f 16-grafana-deployment.yaml
     
     print_info "Waiting for monitoring components to be ready..."
-    kubectl wait --for=condition=ready pod -l app=prometheus -n minidrive --timeout=120s || print_warning "Prometheus may still be starting..."
-    kubectl wait --for=condition=ready pod -l app=loki -n minidrive --timeout=120s || print_warning "Loki may still be starting..."
-    kubectl wait --for=condition=ready pod -l app=tempo -n minidrive --timeout=120s || print_warning "Tempo may still be starting..."
-    kubectl wait --for=condition=ready pod -l app=grafana -n minidrive --timeout=120s || print_warning "Grafana may still be starting..."
+    sudo kubectl wait --for=condition=ready pod -l app=prometheus -n minidrive --timeout=120s || print_warning "Prometheus may still be starting..."
+    sudo kubectl wait --for=condition=ready pod -l app=loki -n minidrive --timeout=120s || print_warning "Loki may still be starting..."
+    sudo kubectl wait --for=condition=ready pod -l app=tempo -n minidrive --timeout=120s || print_warning "Tempo may still be starting..."
+    sudo kubectl wait --for=condition=ready pod -l app=grafana -n minidrive --timeout=120s || print_warning "Grafana may still be starting..."
     
     print_info "Monitoring stack deployed!"
     print_warning "Default Grafana credentials: admin/admin (CHANGE THIS!)"

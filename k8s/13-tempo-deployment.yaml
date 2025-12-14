@@ -47,9 +47,12 @@ data:
           queue_depth: 10000
 
     overrides:
-      defaults:
-        ingestion_rate_limit: 10000
-        ingestion_burst_size: 20000
+      per_tenant_override_config: /etc/tempo/overrides.yml
+      
+    global_overrides:
+      ingestion_rate_strategy: local
+      ingestion_rate_limit_bytes: 10000000
+      ingestion_burst_size_bytes: 20000000
 ---
 apiVersion: apps/v1
 kind: Deployment
