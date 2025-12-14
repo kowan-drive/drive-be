@@ -166,7 +166,17 @@ kubectl create secret generic minidrive-secrets \
 print_info "Main application secret created/updated successfully!"
 
 # Create/Update Grafana admin secret
-prDisplay all credentials clearly
+print_step "Creating Grafana admin secret..."
+kubectl create secret generic grafana-admin \
+  --namespace=minidrive \
+  --from-literal=admin-user="${GRAFANA_ADMIN_USER}" \
+  --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+print_info "Grafana admin secret created/updated successfully!"
+echo ""
+
+# Display all credentials clearly
 echo ""
 print_info "============================================"
 print_info "IMPORTANT: YOUR LOGIN CREDENTIALS"
@@ -221,24 +231,5 @@ echo "  4. Never commit secrets to version control"
 echo ""
 print_info "To access services locally, use port-forward:"
 echo "  kubectl port-forward -n minidrive svc/grafana-service 3000:3000"
-echo "  kubectl port-forward -n minidrive svc/minio-service 9001:9001t found. Skipping restart."
-    fi
-fi
-
-echo ""
-print_info "Setup complete!"
-echo ""
-print_warning "Remember to:"
-echo "  1. Store the backup file (if created) in a secure password manager"
-echo "  2. Delete the local backup file after storing it securely"
-echo "  3. Never commit secrets to version control"
-
-# Offer to view the secret (base64 encoded)
-echo ""
-read -p "Do you want to view the secret in Kubernetes? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo ""
-    kubectl get secret minidrive-secrets -n minidrive -o yaml
-fi
+echo "  kubectl port-forward -n minidrive svc/minio-service 9001:9001"
 
