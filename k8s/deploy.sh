@@ -102,7 +102,7 @@ read -p "Press Enter to continue or Ctrl+C to cancel..."
 kubectl apply -f 08-app-deployment.yaml
 
 print_info "Waiting for application to be ready..."
-kubectl wait --for=condition=ready pod -l app=minidrive -n minidrive --timeout=300s || {
+kubectl wait --for=condition=ready pod -l app=minidrive -n minidrive --timeout=120s || {
     print_error "Application failed to start. Check logs with: kubectl logs -l app=minidrive -n minidrive"
     exit 1
 }
