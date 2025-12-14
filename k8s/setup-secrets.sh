@@ -175,3 +175,4 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     kubectl get secret minidrive-secrets -n minidrive -o yaml
 fi
+

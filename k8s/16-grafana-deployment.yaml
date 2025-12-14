@@ -117,3 +117,4 @@ spec:
     targetPort: 3000
     protocol: TCP
     name: http
+

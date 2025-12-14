@@ -46,7 +46,7 @@ spec:
       
       # Run Prisma migrations
       - name: prisma-migrate
-        image: your-docker-registry/minidrive-app:latest  # UPDATE THIS
+        image: andrew4coding/minidrive-app:latest  
         imagePullPolicy: Always
         command:
         - sh
@@ -69,7 +69,7 @@ spec:
       
       containers:
       - name: app
-        image: your-docker-registry/minidrive-app:latest  # UPDATE THIS
+        image: andrew4coding/minidrive-app:latest  # UPDATE THIS
         imagePullPolicy: Always
         ports:
         - containerPort: 3001
@@ -118,3 +118,4 @@ spec:
   - port: 80
     targetPort: 3001
     protocol: TCP
+

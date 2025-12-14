@@ -27,7 +27,7 @@ docker build -t your-registry/minidrive-app:v1.0.0 .
 docker push your-registry/minidrive-app:v1.0.0
 
 # 2. Update image reference in k8s/08-app-deployment.yaml
-# Change: image: your-docker-registry/minidrive-app:latest
+# Change: image: andrew4coding/minidrive-app:latest
 
 # 3. Setup secrets
 cd k8s
@@ -712,3 +712,4 @@ For issues:
 **Kubernetes Version**: 1.24+ (k3s compatible)  
 **Ingress**: Traefik  
 **Optimized for**: 8GB RAM / 60GB Storage
+

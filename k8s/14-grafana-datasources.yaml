@@ -47,3 +47,4 @@ data:
             spanEndTimeShift: '1h'
             filterByTraceID: false
             filterBySpanID: false
+

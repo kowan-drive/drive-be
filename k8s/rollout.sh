@@ -155,3 +155,4 @@ if [ "$ACTION" = "scale" ]; then
     print_info "Scaling in progress..."
     kubectl get pods -n minidrive -l app=minidrive -w
 fi
+

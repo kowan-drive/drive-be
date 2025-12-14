@@ -145,3 +145,4 @@ spec:
     targetPort: 9096
     protocol: TCP
     name: grpc
+

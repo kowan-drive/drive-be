@@ -58,3 +58,4 @@ spec:
           mc anonymous set none myminio/${MINIO_BUCKET_NAME}
           
           echo "MinIO setup completed successfully!"
+

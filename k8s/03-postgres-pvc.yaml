@@ -12,3 +12,4 @@ spec:
   # Optional: Add storageClassName if your cluster has specific storage classes
   # storageClassName: local-path  # k3s default
 
+

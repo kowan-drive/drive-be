@@ -177,3 +177,4 @@ print_warning "Don't forget to:"
 echo "  1. Point your DNS to the ingress IP"
 echo "  2. Configure TLS/SSL certificates"
 echo "  3. Update all placeholder secrets with secure values"
+
