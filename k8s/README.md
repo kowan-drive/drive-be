@@ -23,8 +23,8 @@ Complete guide for deploying MiniDrive backend to Kubernetes (k3s) with Traefik 
 
 ```bash
 # 1. Build and push your Docker image
-docker build -t your-registry/minidrive-app:v1.0.0 .
-docker push your-registry/minidrive-app:v1.0.0
+docker build -t andrew4coding/minidrive-app:v1.0.0 .
+docker push andrew4coding/minidrive-app:v1.0.0
 
 # 2. Update image reference in k8s/08-app-deployment.yaml
 # Change: image: andrew4coding/minidrive-app:latest
@@ -119,14 +119,14 @@ kubectl get ingressclass  # Should show 'traefik'
 cd /path/to/drive-be
 
 # Build the Docker image
-docker build -t your-registry/minidrive-app:v1.0.0 .
+docker build -t andrew4coding/minidrive-app:v1.0.0 .
 
 # Push to your registry
-docker push your-registry/minidrive-app:v1.0.0
+docker push andrew4coding/minidrive-app:v1.0.0
 
 # Tag as latest
-docker tag your-registry/minidrive-app:v1.0.0 your-registry/minidrive-app:latest
-docker push your-registry/minidrive-app:latest
+docker tag andrew4coding/minidrive-app:v1.0.0 andrew4coding/minidrive-app:latest
+docker push andrew4coding/minidrive-app:latest
 ```
 
 ### 2. Update Image References
@@ -134,7 +134,7 @@ docker push your-registry/minidrive-app:latest
 Edit `k8s/08-app-deployment.yaml` (lines 49 and 72):
 
 ```yaml
-image: your-registry/minidrive-app:latest  # Update this
+image: andrew4coding/minidrive-app:latest  # Update this
 ```
 
 ### 3. Setup Secrets
@@ -399,13 +399,13 @@ kubectl rollout restart deployment/minidrive-app -n minidrive
 
 ```bash
 # Build and push new version
-docker build -t your-registry/minidrive-app:v1.1.0 .
-docker push your-registry/minidrive-app:v1.1.0
+docker build -t andrew4coding/minidrive-app:v1.1.0 .
+docker push andrew4coding/minidrive-app:v1.1.0
 
 # Deploy
 ./rollout.sh update v1.1.0
 # or
-kubectl set image deployment/minidrive-app app=your-registry/minidrive-app:v1.1.0 -n minidrive
+kubectl set image deployment/minidrive-app app=andrew4coding/minidrive-app:v1.1.0 -n minidrive
 kubectl rollout status deployment/minidrive-app -n minidrive
 ```
 
@@ -457,11 +457,11 @@ kubectl logs <pod-name> -n minidrive --previous  # Previous crashed container
 
 ```bash
 # Check if image exists
-docker pull your-registry/minidrive-app:latest
+docker pull andrew4coding/minidrive-app:latest
 
 # For private registries, create secret
 kubectl create secret docker-registry regcred \
-  --docker-server=your-registry \
+  --docker-server=andrew4coding \
   --docker-username=your-username \
   --docker-password=your-password \
   --namespace=minidrive
