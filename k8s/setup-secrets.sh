@@ -167,6 +167,12 @@ print_info "Main application secret created/updated successfully!"
 
 # Create/Update Grafana admin secret
 print_step "Creating Grafana admin secret..."
+
+# Check if grafana-admin secret already exists
+if kubectl get secret grafana-admin -n minidrive &> /dev/null; then
+    print_warning "Grafana admin secret already exists. It will be updated."
+fi
+
 kubectl create secret generic grafana-admin \
   --namespace=minidrive \
   --from-literal=admin-user="${GRAFANA_ADMIN_USER}" \
@@ -174,6 +180,14 @@ kubectl create secret generic grafana-admin \
   --dry-run=client -o yaml | kubectl apply -f -
 
 print_info "Grafana admin secret created/updated successfully!"
+
+# Automatically restart Grafana to pick up new credentials
+if kubectl get deployment grafana -n minidrive &> /dev/null; then
+    print_step "Restarting Grafana to apply new credentials..."
+    kubectl rollout restart deployment/grafana -n minidrive
+    print_info "Waiting for Grafana to be ready..."
+    kubectl rollout status deployment/grafana -n minidrive --timeout=120s || print_warning "Grafana restart taking longer than expected"
+fi
 echo ""
 
 # Display all credentials clearly
@@ -201,16 +215,12 @@ print_info "============================================"
 echo ""
 
 # Ask if user wants to restart deployments to pick up new secrets
-read -p "Do you want to restart deployments to pick up the new secrets? (y/n) " -n 1 -r
+read -p "Do you want to restart other deployments (minidrive-app, minio) to pick up new secrets? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     if kubectl get deployment minidrive-app -n minidrive &> /dev/null; then
         print_step "Restarting minidrive-app deployment..."
         kubectl rollout restart deployment/minidrive-app -n minidrive
-    fi
-    if kubectl get deployment grafana -n minidrive &> /dev/null; then
-        print_step "Restarting grafana deployment..."
-        kubectl rollout restart deployment/grafana -n minidrive
     fi
     if kubectl get deployment minio -n minidrive &> /dev/null; then
         print_step "Restarting minio deployment..."
@@ -223,11 +233,15 @@ fi
 echo ""
 print_info "Setup complete!"
 echo ""
-print_warning "Remember to:"
-echo "  1. Store the credentials shown above in a secure password manager"
-echo "  2. Store the backup file (if created) in a secure location"
-echo "  3. Delete the local backup file after storing it securely"
-echo "  4. Never commit secrets to version control"
+print_warning "IMPORTANT NOTES:"
+echo "  1. Grafana has been restarted with new credentials"
+echo "  2. If you previously logged into Grafana with old credentials, you may need to:"
+echo "     - Clear your browser cache/cookies for the Grafana URL"
+echo "     - Or access Grafana in an incognito/private window"
+echo "  3. Store all credentials shown above in a secure password manager"
+echo "  4. Store the backup file (if created) in a secure location"
+echo "  5. Delete the local backup file after storing it securely"
+echo "  6. Never commit secrets to version control"
 echo ""
 print_info "To access services locally, use port-forward:"
 echo "  kubectl port-forward -n minidrive svc/grafana-service 3000:3000"
