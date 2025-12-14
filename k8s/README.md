@@ -576,7 +576,49 @@ kubectl edit pvc minio-pvc -n minidrive
 
 ## Monitoring
 
-### Basic Monitoring
+### Full Monitoring Stack
+
+MiniDrive includes a complete monitoring stack with Prometheus, Loki, Tempo, and Grafana.
+
+**See [MONITORING.md](./MONITORING.md) for complete documentation.**
+
+Quick setup:
+
+```bash
+cd k8s
+
+# Deploy monitoring stack
+kubectl apply -f 10-prometheus-configmap.yaml
+kubectl apply -f 11-prometheus-deployment.yaml
+kubectl apply -f 12-loki-deployment.yaml
+kubectl apply -f 13-tempo-deployment.yaml
+kubectl apply -f 15-promtail-deployment.yaml
+kubectl apply -f 14-grafana-datasources.yaml
+kubectl apply -f 17-grafana-dashboards.yaml
+kubectl apply -f 16-grafana-deployment.yaml
+kubectl apply -f 18-monitoring-ingress.yaml
+
+# Set Grafana admin password
+GRAFANA_PASSWORD=$(openssl rand -base64 32)
+kubectl create secret generic grafana-admin \
+  --namespace=minidrive \
+  --from-literal=admin-user='admin' \
+  --from-literal=admin-password="${GRAFANA_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "Grafana password: ${GRAFANA_PASSWORD}"
+```
+
+**Access Grafana**: `https://grafana.your-domain.com` (after configuring ingress)
+
+**Pre-built Dashboard**: "MiniDrive Monitoring Dashboard" includes:
+- CPU and Memory usage
+- HTTP request metrics
+- Storage usage
+- Application logs
+- Distributed traces
+
+### Basic Monitoring (Without Full Stack)
 
 ```bash
 # Watch pod status
@@ -601,14 +643,6 @@ Check probe status:
 ```bash
 kubectl describe pod <pod-name> -n minidrive | grep -A 10 "Conditions:"
 ```
-
-### Advanced Monitoring (Optional)
-
-Consider installing:
-
-1. **Prometheus + Grafana** for metrics
-2. **ELK Stack** or **Loki** for log aggregation
-3. **Jaeger** for distributed tracing
 
 ---
 

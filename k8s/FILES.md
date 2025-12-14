@@ -123,6 +123,105 @@ Ingress resources for external access:
 kubectl apply -f 09-ingress.yaml
 ```
 
+### 11. `10-prometheus-configmap.yaml`
+Prometheus configuration:
+- Scrape intervals and retention
+- Kubernetes service discovery
+- Application metrics scraping
+- Container metrics (cAdvisor)
+
+```bash
+kubectl apply -f 10-prometheus-configmap.yaml
+```
+
+### 12. `11-prometheus-deployment.yaml`
+Prometheus deployment:
+- Service account with RBAC
+- Persistent storage (10Gi, 30 days retention)
+- Scrapes metrics from all components
+- ClusterIP service on port 9090
+
+```bash
+kubectl apply -f 11-prometheus-deployment.yaml
+```
+
+### 13. `12-loki-deployment.yaml`
+Loki log aggregation:
+- Persistent storage (10Gi, 30 days retention)
+- Collects logs from all pods
+- Integrated with Grafana
+
+```bash
+kubectl apply -f 12-loki-deployment.yaml
+```
+
+### 14. `13-tempo-deployment.yaml`
+Tempo distributed tracing:
+- OTLP receiver (gRPC and HTTP)
+- Persistent storage (10Gi, 1 hour retention)
+- Integrated with Grafana
+
+```bash
+kubectl apply -f 13-tempo-deployment.yaml
+```
+
+### 15. `14-grafana-datasources.yaml`
+Grafana datasource configuration:
+- Prometheus datasource
+- Loki datasource
+- Tempo datasource
+- Trace-to-log correlation
+
+```bash
+kubectl apply -f 14-grafana-datasources.yaml
+```
+
+### 16. `15-promtail-deployment.yaml`
+Promtail log collection:
+- DaemonSet (runs on each node)
+- Collects pod logs
+- Sends logs to Loki
+- Service account with RBAC
+
+```bash
+kubectl apply -f 15-promtail-deployment.yaml
+```
+
+### 17. `16-grafana-deployment.yaml`
+Grafana dashboard:
+- Persistent storage (5Gi)
+- Pre-configured datasources
+- Pre-built MiniDrive dashboard
+- Admin credentials via secret
+
+**⚠️ UPDATE**: Change Grafana admin password in secret.
+
+```bash
+kubectl apply -f 16-grafana-deployment.yaml
+```
+
+### 18. `17-grafana-dashboards.yaml`
+Grafana dashboard provisioning:
+- Dashboard provider configuration
+- MiniDrive monitoring dashboard JSON
+- Auto-loaded on Grafana startup
+
+```bash
+kubectl apply -f 17-grafana-dashboards.yaml
+```
+
+### 19. `18-monitoring-ingress.yaml`
+Ingress for monitoring tools:
+- Grafana dashboard (grafana.your-domain.com)
+- Prometheus UI (prometheus.your-domain.com, optional)
+- TLS/HTTPS configuration
+
+**⚠️ UPDATE**: Replace placeholder domains with your actual domains.
+
+```bash
+kubectl apply -f 18-monitoring-ingress.yaml
+```
+
 ## Helper Scripts
 
 ### `setup-secrets.sh`
@@ -191,6 +290,13 @@ Condensed quick-start guide for rapid deployment:
 - Troubleshooting commands
 - Security notes
 
+### `MONITORING.md`
+Complete monitoring stack documentation:
+- Prometheus, Loki, Tempo, Grafana setup
+- Dashboard configuration
+- Metrics, logs, and traces
+- Troubleshooting and tuning
+
 ### `FILES.md` (this file)
 Reference documentation for all configuration files.
 
@@ -219,6 +325,16 @@ Protects sensitive files from being committed:
 | Job | minio-init | Bucket setup | 1 | - |
 | Ingress | minidrive-ingress | External access | - | - |
 | Ingress | minio-console-ingress | Admin access | - | - |
+| Ingress | grafana-ingress | Grafana access | - | - |
+| Deployment | prometheus | Metrics collection | 1 | 10Gi |
+| Deployment | loki | Log aggregation | 1 | 10Gi |
+| Deployment | tempo | Distributed tracing | 1 | 10Gi |
+| Deployment | grafana | Dashboards | 1 | 5Gi |
+| DaemonSet | promtail | Log collection | 1/node | - |
+| Service | prometheus-service | Prometheus access | - | - |
+| Service | loki-service | Loki access | - | - |
+| Service | tempo-service | Tempo access | - | - |
+| Service | grafana-service | Grafana access | - | - |
 
 ## Port Mapping
 
@@ -228,6 +344,15 @@ Protects sensitive files from being committed:
 | MinIO API | 9000 | Internal only (ClusterIP) |
 | MinIO Console | 9001 | Via ingress (optional) |
 | MiniDrive App | 3001 | Via ingress (port 80/443) |
+| Prometheus | 9090 | Internal only (ClusterIP) |
+| Loki | 3100 | Internal only (ClusterIP) |
+| Tempo | 3200 | Internal only (ClusterIP) |
+| Grafana | 3000 | Via ingress (optional) |
+| Prometheus | 9090 | Via ingress (optional) |
+| Grafana | 3000 | Via ingress (port 80/443) |
+| Loki | 3100 | Internal only (ClusterIP) |
+| Tempo | 3200 | Internal only (ClusterIP) |
+| Promtail | 3101 | Internal only (ClusterIP) |
 
 ## Environment Variables
 
@@ -265,6 +390,7 @@ Protects sensitive files from being committed:
 5. MinIO initialization (bucket creation)
 6. Application (MiniDrive backend)
 7. Ingress (external access)
+8. Monitoring stack (Prometheus, Loki, Tempo, Promtail, Grafana) - optional
 
 ## Common Commands
 
@@ -367,17 +493,18 @@ After deployment:
 
 1. **Configure DNS** - Point your domain to the ingress IP
 2. **Enable TLS** - Setup cert-manager or upload certificates
-3. **Monitor** - Setup Prometheus/Grafana for monitoring
+3. **Monitor** - Monitoring stack is ready (see [MONITORING.md](./MONITORING.md))
 4. **Backup** - Configure automated database backups
 5. **CI/CD** - Setup automated deployments
 6. **Autoscaling** - Configure HPA for dynamic scaling
-7. **Logging** - Setup log aggregation (ELK/Loki)
+7. **Change Grafana password** - Update default admin credentials
 
 ## Support
 
 For issues or questions:
 - Check [README.md](./README.md) for detailed documentation
 - Check [QUICKSTART.md](./QUICKSTART.md) for quick reference
+- Check [MONITORING.md](./MONITORING.md) for monitoring setup
 - Review pod logs: `kubectl logs -f deployment/minidrive-app -n minidrive`
 - Check events: `kubectl get events -n minidrive`
 

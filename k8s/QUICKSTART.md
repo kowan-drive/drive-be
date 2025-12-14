@@ -286,7 +286,7 @@ kubectl delete pvc postgres-pvc minio-pvc -n minidrive
 
 ## Next Steps
 
-- Setup monitoring (Prometheus/Grafana)
+- Setup monitoring (see [MONITORING.md](./MONITORING.md))
 - Configure backup strategy
 - Setup CI/CD pipeline
 - Configure autoscaling (HPA)

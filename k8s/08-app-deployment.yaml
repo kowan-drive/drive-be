@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: minidrive
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3001"
+        prometheus.io/path: "/metrics"
     spec:
       initContainers:
       # Wait for PostgreSQL to be ready
@@ -70,6 +74,8 @@ spec:
         ports:
         - containerPort: 3001
           name: http
+        - containerPort: 3001
+          name: metrics
         envFrom:
         - configMapRef:
             name: minidrive-config

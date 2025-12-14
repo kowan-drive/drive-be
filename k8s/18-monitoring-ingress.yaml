@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: minidrive
+  annotations:
+    # Uncomment and configure based on your ingress controller
+    # For Traefik:
+    # traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # traefik.ingress.kubernetes.io/router.tls: "true"
+    
+    # For nginx-ingress:
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: grafana-basic-auth
+    # nginx.ingress.kubernetes.io/auth-realm: "Grafana Authentication Required"
+spec:
+  ingressClassName: traefik  # Change to 'nginx' if using nginx-ingress
+  rules:
+  # Grafana Dashboard
+  - host: grafana.your-domain.com  # UPDATE THIS
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana-service
+            port:
+              number: 3000
+  
+  # Prometheus (optional - consider restricting access)
+  - host: prometheus.your-domain.com  # UPDATE THIS - Optional
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-service
+            port:
+              number: 9090
+  
+  # Optional: Add TLS configuration
+  # tls:
+  # - hosts:
+  #   - grafana.your-domain.com
+  #   - prometheus.your-domain.com
+  #   secretName: monitoring-tls-cert

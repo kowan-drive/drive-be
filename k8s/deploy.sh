@@ -113,6 +113,48 @@ print_warning "Please ensure you've configured your domain in 09-ingress.yaml"
 read -p "Press Enter to continue or Ctrl+C to cancel..."
 kubectl apply -f 09-ingress.yaml
 
+# Ask about monitoring
+echo ""
+read -p "Do you want to deploy the monitoring stack (Prometheus, Loki, Tempo, Grafana)? [y/N] " -n 1 -r
+echo ""
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    print_info "Deploying monitoring stack..."
+    
+    # Prometheus
+    print_info "Deploying Prometheus..."
+    kubectl apply -f 10-prometheus-configmap.yaml
+    kubectl apply -f 11-prometheus-deployment.yaml
+    
+    # Loki
+    print_info "Deploying Loki..."
+    kubectl apply -f 12-loki-deployment.yaml
+    
+    # Tempo
+    print_info "Deploying Tempo..."
+    kubectl apply -f 13-tempo-deployment.yaml
+    
+    # Promtail
+    print_info "Deploying Promtail..."
+    kubectl apply -f 17-promtail-deployment.yaml
+    
+    # Grafana
+    print_info "Deploying Grafana..."
+    kubectl apply -f 14-grafana-datasources.yaml
+    kubectl apply -f 15-grafana-dashboard.yaml
+    kubectl apply -f 16-grafana-deployment.yaml
+    
+    print_info "Waiting for monitoring components to be ready..."
+    kubectl wait --for=condition=ready pod -l app=prometheus -n minidrive --timeout=120s || print_warning "Prometheus may still be starting..."
+    kubectl wait --for=condition=ready pod -l app=loki -n minidrive --timeout=120s || print_warning "Loki may still be starting..."
+    kubectl wait --for=condition=ready pod -l app=tempo -n minidrive --timeout=120s || print_warning "Tempo may still be starting..."
+    kubectl wait --for=condition=ready pod -l app=grafana -n minidrive --timeout=120s || print_warning "Grafana may still be starting..."
+    
+    print_info "Monitoring stack deployed!"
+    print_warning "Default Grafana credentials: admin/admin (CHANGE THIS!)"
+    print_info "Access Grafana via port-forward: kubectl port-forward -n minidrive svc/grafana-service 3000:3000"
+    print_info "Or configure Grafana ingress in 09-ingress.yaml and update DNS"
+fi
+
 print_info "Deployment complete!"
 echo ""
 print_info "Checking deployment status..."
