@@ -1,5 +1,6 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
+import { stream } from 'hono/streaming';
 import { authMiddleware } from '../../middlewares/auth.middleware';
 import {
     createShare,
@@ -9,6 +10,7 @@ import {
     getShareInfo,
 } from './shares.service';
 import { createShareSchema, accessShareSchema } from './shares.schema';
+import { getFileStream } from '../../lib/minio';
 
 const shares = new Hono();
 
@@ -93,15 +95,27 @@ shares.get('/:token/info', async (c) => {
 
 /**
  * GET /shares/:token
- * Access a shared file (public, no auth required)
+ * Access a shared file (public, no auth required) - streams file directly
  */
 shares.get('/:token', async (c) => {
     try {
         const token = c.req.param('token');
         const result = await accessShare(token);
 
-        // Redirect to presigned URL
-        return c.redirect(result.presignedUrl);
+        // Get file stream from MinIO
+        const fileStream = await getFileStream(result.objectKey);
+
+        // Set response headers
+        c.header('Content-Type', result.mimeType);
+        c.header('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);
+        c.header('Content-Length', result.size.toString());
+
+        // Stream the file directly to the client
+        return stream(c, async (stream) => {
+            for await (const chunk of fileStream) {
+                await stream.write(chunk);
+            }
+        });
     } catch (error) {
         return c.json(
             {

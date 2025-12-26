@@ -1,6 +1,5 @@
 import prisma from '../../../prisma/prisma';
 import { generateShareToken } from '../../lib/encryption';
-import { generatePresignedUrl } from '../../lib/minio';
 
 interface CreateShareParams {
     fileId: string;
@@ -88,7 +87,7 @@ export async function getShareInfo(token: string) {
 }
 
 /**
- * Access a shared file (returns presigned URL)
+ * Access a shared file (returns file info for streaming)
  */
 export async function accessShare(token: string) {
     const share = await prisma.share.findUnique({
@@ -122,14 +121,9 @@ export async function accessShare(token: string) {
         },
     });
 
-    // Generate presigned URL (valid for 1 hour)
-    // Note: MinIO presigned URLs don't require SSE-C headers
-    // So shared files will be accessible without decryption key
-    // This is a trade-off for sharing functionality
-    const presignedUrl = await generatePresignedUrl(share.file.minioObjectKey, 3600);
-
+    // Return file info for streaming (no presigned URL)
     return {
-        presignedUrl,
+        objectKey: share.file.minioObjectKey,
         filename: share.file.name,
         size: Number(share.file.size),
         mimeType: share.file.mimeType,

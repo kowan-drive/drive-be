@@ -1,5 +1,6 @@
 import { Client } from 'minio';
 import { ENV } from './env';
+import { Readable } from 'stream';
 
 // Initialize MinIO client
 export const minioClient = new Client({
@@ -30,7 +31,6 @@ export async function ensureBucket(): Promise<void> {
 
 /**
  * Upload file to MinIO
- * Note: SSE-C encryption removed to support non-SSL connections in development
  */
 export async function uploadFileWithEncryption(
     objectKey: string,
@@ -49,7 +49,6 @@ export async function uploadFileWithEncryption(
 
 /**
  * Download file from MinIO
- * Note: SSE-C decryption removed to support non-SSL connections in development
  */
 export async function downloadFileWithDecryption(
     objectKey: string,
@@ -69,6 +68,13 @@ export async function downloadFileWithDecryption(
             dataStream.on('error', reject);
         });
     });
+}
+
+/**
+ * Get file as a readable stream from MinIO
+ */
+export async function getFileStream(objectKey: string): Promise<Readable> {
+    return await minioClient.getObject(BUCKET_NAME, objectKey);
 }
 
 /**
